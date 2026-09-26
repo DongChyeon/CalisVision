@@ -4,6 +4,7 @@ import com.calisvision.domain.geometry.toVec
 import com.calisvision.domain.model.BodySide
 import com.calisvision.domain.model.FramePose
 import com.calisvision.domain.model.Joint
+import com.calisvision.domain.model.MIN_JOINT_VISIBILITY
 
 object HoldSegmentDetector {
     const val WINDOW = 15
@@ -11,7 +12,8 @@ object HoldSegmentDetector {
 
     /**
      * Longest run of frames covered by a [WINDOW]-sample window in which the wrist and ankle
-     * (mean of both sides) x and y ranges all stay below [MAX_RANGE] of frame height.
+     * x and y ranges all stay below [MAX_RANGE] of frame height. Per window and joint, the more visible
+     * side that is at least [MIN_JOINT_VISIBILITY] in every frame is used; if neither side is, the window is not still.
      * [frames] are consecutive samples; returns the sampleIndex range or null.
      */
     fun detect(frames: List<FramePose>, aspect: Float): IntRange? {
@@ -37,14 +39,13 @@ object HoldSegmentDetector {
     }
 
     private fun isStill(window: List<FramePose>, joint: Joint, aspect: Float): Boolean {
-        val points = window.map { pose ->
-            val l = pose[BodySide.LEFT, joint] ?: return false
-            val r = pose[BodySide.RIGHT, joint] ?: return false
-            val a = l.toVec(aspect)
-            val b = r.toVec(aspect)
-            (a.x + b.x) / 2f to (a.y + b.y) / 2f
-        }
-        return range(points.map { it.first }) < MAX_RANGE && range(points.map { it.second }) < MAX_RANGE
+        val points = BodySide.entries
+            .map { side -> window.map { it[side, joint]?.takeIf { l -> l.visibility >= MIN_JOINT_VISIBILITY } } }
+            .filter { side -> side.all { it != null } }
+            .maxByOrNull { side -> side.sumOf { it!!.visibility.toDouble() } }
+            ?.map { it!!.toVec(aspect) }
+            ?: return false
+        return range(points.map { it.x }) < MAX_RANGE && range(points.map { it.y }) < MAX_RANGE
     }
 
     private fun range(values: List<Float>) = values.max() - values.min()

@@ -9,6 +9,7 @@ import com.calisvision.domain.model.PoseLandmark
 import com.calisvision.domain.rules.PoseFault
 import com.calisvision.domain.rules.RuleId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -33,6 +34,14 @@ class AngleTimelineTest {
         assertTrue(timeline.frames[2].angles.getValue(HandstandKnowledge.ALIGNMENT)!! > 180f)
         assertTrue(timeline.frames[2].angles.getValue(HandstandKnowledge.HIP)!! > 180f)
         assertEquals(listOf(0, 1, 2), timeline.frames.map { it.sampleIndex })
+    }
+
+    @Test
+    fun lowVisibilityJointMakesAngleNull() {
+        val dim = TestPoses.handstand() + (PoseLandmark.LEFT_KNEE to Landmark(0.5f, 0.28f, visibility = 0.49f))
+        val angles = AngleTimeline.build(listOf(TestPoses.frame(0, dim)), exercise, orientation, aspect = 1f).frames[0].angles
+        assertNull(angles.getValue(HandstandKnowledge.HIP))
+        assertEquals(180f, angles.getValue(HandstandKnowledge.ALIGNMENT)!!, 0.01f)
     }
 
     private fun faults(points: Map<Int, Landmark>, ruleId: RuleId): List<PoseFault> {

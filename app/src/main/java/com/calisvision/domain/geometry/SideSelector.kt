@@ -21,7 +21,7 @@ object SideSelector {
         val side = if (leftVotes * 2 >= usable.size) BodySide.LEFT else BodySide.RIGHT
 
         val signs = usable.mapNotNull { pose ->
-            val front = FrontVector.of(pose, side) ?: return@mapNotNull null
+            val front = FrontVector.of(pose, side, aspect) ?: return@mapNotNull null
             val shoulder = pose[side, Joint.SHOULDER] ?: return@mapNotNull null
             val ankle = pose[side, Joint.ANKLE] ?: return@mapNotNull null
             AngleCalculator.frontSign(shoulder, ankle, front, aspect).takeIf { it != 0 }

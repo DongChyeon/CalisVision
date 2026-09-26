@@ -7,3 +7,6 @@ data class Landmark(
     val z: Float = 0f,
     val visibility: Float = 1f,
 )
+
+/** Joints below this visibility are treated as missing. */
+const val MIN_JOINT_VISIBILITY = 0.5f
