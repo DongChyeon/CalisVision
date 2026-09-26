@@ -7,6 +7,9 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.io.File
 
+/** [width] × [height] is the first decoded (downscaled) frame, 0 × 0 when none decoded. */
+data class ProcessedFrames(val poses: List<FramePose>, val width: Int, val height: Int)
+
 class PoseLandmarkerEngine(private val detectorFactory: () -> PoseDetector) {
 
     suspend fun process(
@@ -14,13 +17,19 @@ class PoseLandmarkerEngine(private val detectorFactory: () -> PoseDetector) {
         rotationDeg: Int,
         frameDir: File?,
         onProgress: suspend (done: Int, total: Int) -> Unit,
-    ): List<FramePose> {
+    ): ProcessedFrames {
         val total = source.info.frameCount
         val poses = Array(total) { FramePose(it, it * FrameSource.SAMPLE_INTERVAL_MS, null) }
+        var width = 0
+        var height = 0
         frameDir?.mkdirs()
         detectorFactory().use { detector ->
             source.frames().collect { frame ->
                 currentCoroutineContext().ensureActive()
+                if (height == 0) {
+                    width = frame.bitmap.width
+                    height = frame.bitmap.height
+                }
                 try {
                     val landmarks = detector.detectVideo(frame.bitmap, frame.sampleIndex * FrameSource.SAMPLE_INTERVAL_MS, rotationDeg)
                     poses[frame.sampleIndex] = FramePose(frame.sampleIndex, frame.displayTimeMs, landmarks)
@@ -31,7 +40,7 @@ class PoseLandmarkerEngine(private val detectorFactory: () -> PoseDetector) {
                 onProgress(frame.sampleIndex + 1, total)
             }
         }
-        return poses.toList()
+        return ProcessedFrames(poses.toList(), width, height)
     }
 
     private fun writeJpeg(bitmap: Bitmap, file: File) {

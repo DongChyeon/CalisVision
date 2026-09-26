@@ -4,6 +4,8 @@ import com.calisvision.domain.model.BodySide
 import com.calisvision.domain.model.FramePose
 import com.calisvision.domain.rules.Exercise
 import com.calisvision.video.FrameSource
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -14,12 +16,13 @@ object OrientationResolver {
     const val TIE_EPSILON = 0.01f
     val ROTATIONS = listOf(0, 180)
 
-    fun resolve(source: FrameSource, exercise: Exercise, detector: PoseDetector): Int {
+    suspend fun resolve(source: FrameSource, exercise: Exercise, detector: PoseDetector): Int {
         val poses = ROTATIONS.associateWith { mutableListOf<FramePose>() }
         for (index in sampleIndices(source.info.frameCount)) {
             val frame = source.frameAt(index) ?: continue
             try {
                 for (rotation in ROTATIONS) {
+                    currentCoroutineContext().ensureActive()
                     poses.getValue(rotation) += FramePose(index, frame.displayTimeMs, detector.detectImage(frame.bitmap, rotation))
                 }
             } finally {
