@@ -3,7 +3,6 @@ package com.calisvision.domain.analysis
 import com.calisvision.domain.geometry.AngleCalculator
 import com.calisvision.domain.geometry.BodyOrientation
 import com.calisvision.domain.model.FramePose
-import com.calisvision.domain.rules.AlignmentStrategy
 import com.calisvision.domain.rules.AngleThreshold
 import com.calisvision.domain.rules.Exercise
 import com.calisvision.domain.rules.PoseRule
@@ -37,7 +36,6 @@ data class AngleTimeline(val frames: List<AngleFrame>) {
 
         private fun measure(pose: FramePose, rule: PoseRule, orientation: BodyOrientation, aspect: Float): Float? {
             val p = rule.joints.map { pose[orientation.side, it] ?: return null }
-            if (p.size == 4) return 180f + AlignmentStrategy.deviation(p[0], p[1], p[2], p[3], aspect, orientation.frontSign)
             return when (rule.threshold) {
                 is AngleThreshold.Deviation -> AngleCalculator.signedAngle(p[0], p[1], p[2], aspect, orientation.frontSign)
                 is AngleThreshold.Range -> AngleCalculator.angle(p[0], p[1], p[2], aspect)

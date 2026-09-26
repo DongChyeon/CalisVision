@@ -13,10 +13,7 @@ data class PoseFault(
     val correctionHint: String,
 )
 
-/**
- * [joints] are three joints (a, vertex, c), or four (hand, shoulder, hip, foot) for
- * full-body alignment measured by [AlignmentStrategy]. [faults] maps only the violations that apply.
- */
+/** [joints] are three joints (a, vertex, c); [faults] maps only the violations that apply. */
 data class PoseRule(
     val id: RuleId,
     val name: String,
@@ -25,7 +22,7 @@ data class PoseRule(
     val faults: Map<Violation, PoseFault>,
 ) {
     init {
-        require(joints.size == 3 || joints.size == 4)
+        require(joints.size == 3)
     }
 }
 

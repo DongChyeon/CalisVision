@@ -52,7 +52,7 @@ object HandstandKnowledge {
         PoseRule(
             id = ALIGNMENT,
             name = "전신 정렬",
-            joints = listOf(Joint.WRIST, Joint.SHOULDER, Joint.HIP, Joint.ANKLE),
+            joints = listOf(Joint.WRIST, Joint.HIP, Joint.ANKLE),
             threshold = AngleThreshold.Deviation(maxExtensionDeg = 10f, maxFlexionDeg = 10f),
             faults = mapOf(Violation.EXTENSION to BANANA, Violation.FLEXION to PIKE),
         ),
