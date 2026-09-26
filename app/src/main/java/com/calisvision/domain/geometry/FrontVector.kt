@@ -4,11 +4,11 @@ import com.calisvision.domain.model.BodySide
 import com.calisvision.domain.model.FramePose
 import com.calisvision.domain.model.Joint
 import com.calisvision.domain.model.Landmark
+import com.calisvision.domain.model.MIN_JOINT_VISIBILITY
 import com.calisvision.domain.model.PoseLandmark
 import kotlin.math.abs
 
 object FrontVector {
-    const val MIN_VISIBILITY = 0.5f
     const val MIN_FOOT_AXIS_SIN = 0.3f
 
     /**
@@ -33,5 +33,5 @@ object FrontVector {
         return Vec2(toe.x - heel.x, toe.y - heel.y)
     }
 
-    private fun visible(vararg points: Landmark?) = points.all { it != null && it.visibility >= MIN_VISIBILITY }
+    private fun visible(vararg points: Landmark?) = points.all { it != null && it.visibility >= MIN_JOINT_VISIBILITY }
 }

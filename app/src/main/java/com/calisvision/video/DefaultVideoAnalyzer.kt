@@ -26,8 +26,8 @@ class DefaultVideoAnalyzer(
         emit(AnalysisProgress.ResolvingOrientation)
         val sessionId = UUID.randomUUID().toString()
         val frameDir = File(context.cacheDir, "${CalisVisionApp.ANALYSIS_DIR}/$sessionId")
-        try {
-            val result = RetrieverFrameSource.open(context, uri).use { source ->
+        val result = try {
+            RetrieverFrameSource.open(context, uri).use { source ->
                 val rotation = detectorFactory().use { OrientationResolver.resolve(source, exercise, it) }
                 val processed = PoseLandmarkerEngine(detectorFactory).process(source, rotation, frameDir) { done, total ->
                     emit(AnalysisProgress.Processing(done, total))
@@ -43,11 +43,11 @@ class DefaultVideoAnalyzer(
                     frameDir = frameDir.absolutePath,
                 )
             }
-            emit(AnalysisProgress.Completed(result))
         } catch (e: Throwable) {
             frameDir.deleteRecursively()
             throw e
         }
+        emit(AnalysisProgress.Completed(result))
     }
         .catch { emit(AnalysisProgress.Failed(it)) }
         .flowOn(Dispatchers.Default)

@@ -3,6 +3,7 @@ package com.calisvision.domain.knowledge
 import com.calisvision.domain.model.BodySide
 import com.calisvision.domain.model.FramePose
 import com.calisvision.domain.model.Joint
+import com.calisvision.domain.model.MIN_JOINT_VISIBILITY
 import com.calisvision.domain.rules.AngleThreshold
 import com.calisvision.domain.rules.Exercise
 import com.calisvision.domain.rules.PoseFault
@@ -107,7 +108,7 @@ object HandstandKnowledge {
     private fun meanY(pose: FramePose, joint: Joint): Float? {
         val points = BodySide.entries.mapNotNull { pose[it, joint] }
         if (points.isEmpty()) return null
-        val visible = points.filter { it.visibility >= 0.5f }.ifEmpty { points }
+        val visible = points.filter { it.visibility >= MIN_JOINT_VISIBILITY }.ifEmpty { points }
         return visible.map { it.y }.average().toFloat()
     }
 }

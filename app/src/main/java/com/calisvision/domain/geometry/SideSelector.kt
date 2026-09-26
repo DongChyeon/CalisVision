@@ -3,6 +3,7 @@ package com.calisvision.domain.geometry
 import com.calisvision.domain.model.BodySide
 import com.calisvision.domain.model.FramePose
 import com.calisvision.domain.model.Joint
+import com.calisvision.domain.model.MIN_JOINT_VISIBILITY
 
 data class BodyOrientation(val side: BodySide, val frontSign: Int)
 
@@ -22,8 +23,8 @@ object SideSelector {
 
         val signs = usable.mapNotNull { pose ->
             val front = FrontVector.of(pose, side, aspect) ?: return@mapNotNull null
-            val shoulder = pose[side, Joint.SHOULDER] ?: return@mapNotNull null
-            val ankle = pose[side, Joint.ANKLE] ?: return@mapNotNull null
+            val shoulder = pose[side, Joint.SHOULDER]?.takeIf { it.visibility >= MIN_JOINT_VISIBILITY } ?: return@mapNotNull null
+            val ankle = pose[side, Joint.ANKLE]?.takeIf { it.visibility >= MIN_JOINT_VISIBILITY } ?: return@mapNotNull null
             AngleCalculator.frontSign(shoulder, ankle, front, aspect).takeIf { it != 0 }
         }
         if (signs.isEmpty()) return null
