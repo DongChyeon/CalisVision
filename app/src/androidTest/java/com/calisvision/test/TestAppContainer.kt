@@ -2,23 +2,36 @@ package com.calisvision.test
 
 import android.net.Uri
 import com.calisvision.data.AppContainer
+import com.calisvision.domain.analysis.AngleTimeline
 import com.calisvision.domain.model.AnalysisResult
-import com.calisvision.pose.VideoAnalyzer
-import com.calisvision.video.VideoHandle
-import com.calisvision.video.VideoSource
+import com.calisvision.domain.rules.Exercise
+import com.calisvision.video.AnalysisProgress
+import com.calisvision.video.VideoAnalyzer
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 class TestAppContainer(
-    override val videoSource: VideoSource = FakeVideoSource(),
     override val analyzer: VideoAnalyzer = FakeAnalyzer(),
 ) : AppContainer
 
-class FakeVideoSource : VideoSource {
-    override suspend fun openVideo(uri: Uri): VideoHandle =
-        VideoHandle(uri = uri, durationMs = 0L, width = 0, height = 0, rotationDegrees = 0)
-}
-
 class FakeAnalyzer(
-    private val result: (Uri) -> AnalysisResult = { AnalysisResult(it.toString(), 0, 0) },
+    private val progress: (Uri) -> List<AnalysisProgress> = { listOf(AnalysisProgress.Completed(emptyResult(it))) },
 ) : VideoAnalyzer {
-    override suspend fun analyze(uri: Uri): AnalysisResult = result(uri)
+    override fun analyze(uri: Uri, exercise: Exercise): Flow<AnalysisProgress> = flowOf(*progress(uri).toTypedArray())
+
+    companion object {
+        fun emptyResult(uri: Uri) = AnalysisResult(
+            sessionId = "test",
+            videoUri = uri.toString(),
+            width = 0,
+            height = 0,
+            rotationDegrees = 0,
+            frames = emptyList(),
+            orientation = null,
+            holdSegment = null,
+            timeline = AngleTimeline(emptyList()),
+            faults = emptyList(),
+            frameDir = "",
+        )
+    }
 }

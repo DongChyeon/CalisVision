@@ -1,9 +1,7 @@
 package com.calisvision.data
 
-import com.calisvision.pose.VideoAnalyzer
-import com.calisvision.video.VideoSource
+import com.calisvision.video.VideoAnalyzer
 
 interface AppContainer {
-    val videoSource: VideoSource
     val analyzer: VideoAnalyzer
 }
