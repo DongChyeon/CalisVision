@@ -1,0 +1,29 @@
+# --- 민감 파일 (ADR-0005) ---
+# 운동/테스트 영상: 사용자 신체가 찍힌 영상은 저장소에 올리지 않는다
+*.mp4
+*.MP4
+*.mov
+*.MOV
+*.m4v
+*.avi
+*.mkv
+*.webm
+test-videos/
+
+# 서명 키 · 로컬 경로
+*.jks
+*.keystore
+keystore.properties
+local.properties
+
+# OMC 플래닝 상태 (사용자 결정: 비추적)
+.omc/
+
+# --- 표준 Android ---
+build/
+.gradle/
+.idea/
+*.iml
+captures/
+.kotlin/
+.DS_Store
