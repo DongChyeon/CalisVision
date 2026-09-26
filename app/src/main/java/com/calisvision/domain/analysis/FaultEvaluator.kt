@@ -8,12 +8,16 @@ import com.calisvision.domain.rules.RuleId
 import com.calisvision.domain.rules.Violation
 import kotlin.math.abs
 
-/** [range] is in sampleIndex; [angles] holds each contributing rule's angle at its peak; [peakDeviation] is the signed max-|dev| overshoot. */
+/**
+ * [range] is in sampleIndex; [angles] holds each contributing rule's angle at its peak.
+ * [peakDeviation] is the signed θ − 180 with the largest magnitude; [boundaryExcess] the most degrees beyond the violated bound (≥ 0).
+ */
 data class FaultSegment(
     val fault: PoseFault,
     val range: IntRange,
     val angles: Map<RuleId, Float>,
     val peakDeviation: Float,
+    val boundaryExcess: Float,
 ) {
     val faultId: String get() = fault.id
 }
@@ -33,13 +37,16 @@ object FaultEvaluator {
             .sortedWith(compareBy({ it.range.first }, { it.faultId }))
     }
 
-    private class Hit(val ruleId: RuleId, val index: Int, val angle: Float, val deviation: Float)
+    private class Hit(val ruleId: RuleId, val angle: Float, val excess: Float) {
+        val deviation: Float get() = angle - 180f
+    }
 
     private class Run(val fault: PoseFault, var first: Int, var last: Int, val hits: MutableList<Hit>) {
         fun toSegment(timeline: AngleTimeline): FaultSegment {
             val angles = hits.groupBy { it.ruleId }.mapValues { (_, h) -> h.maxBy { abs(it.deviation) }.angle }
             val peak = hits.maxBy { abs(it.deviation) }.deviation
-            return FaultSegment(fault, timeline.frames[first].sampleIndex..timeline.frames[last].sampleIndex, angles, peak)
+            val excess = hits.maxOf { it.excess }
+            return FaultSegment(fault, timeline.frames[first].sampleIndex..timeline.frames[last].sampleIndex, angles, peak, excess)
         }
     }
 
@@ -53,29 +60,29 @@ object FaultEvaluator {
             val fault = check?.let { rule.faults[it.first] }
             if (fault != null && current != null && currentViolation == check.first) {
                 current.last = i
-                current.hits += Hit(rule.id, i, angle, check.second)
+                current.hits += Hit(rule.id, angle, check.second)
                 continue
             }
             current?.takeIf { it.hits.size >= MIN_SAMPLES }?.let(runs::add)
-            current = fault?.let { Run(it, i, i, mutableListOf(Hit(rule.id, i, angle, check.second))) }
+            current = fault?.let { Run(it, i, i, mutableListOf(Hit(rule.id, angle, check.second))) }
             currentViolation = check?.first.takeIf { fault != null }
         }
         current?.takeIf { it.hits.size >= MIN_SAMPLES }?.let(runs::add)
         return runs
     }
 
-    /** Returns the violation and its signed deviation, or null when the angle is within [threshold]. */
+    /** Returns the violation and the degrees beyond its bound, or null when the signed angle θ is within [threshold]. */
     private fun violation(angle: Float, threshold: AngleThreshold): Pair<Violation, Float>? = when (threshold) {
         is AngleThreshold.Deviation -> {
             val dev = angle - 180f
             when {
-                dev > threshold.maxExtensionDeg -> Violation.EXTENSION to dev
-                dev < -threshold.maxFlexionDeg -> Violation.FLEXION to dev
+                dev > threshold.maxExtensionDeg -> Violation.EXTENSION to dev - threshold.maxExtensionDeg
+                dev < -threshold.maxFlexionDeg -> Violation.FLEXION to -threshold.maxFlexionDeg - dev
                 else -> null
             }
         }
         is AngleThreshold.Range -> when {
-            angle < threshold.min -> Violation.BELOW to angle - threshold.min
+            angle < threshold.min -> Violation.BELOW to threshold.min - angle
             angle > threshold.max -> Violation.ABOVE to angle - threshold.max
             else -> null
         }

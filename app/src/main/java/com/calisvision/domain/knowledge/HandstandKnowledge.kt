@@ -48,6 +48,11 @@ object HandstandKnowledge {
         correctionHint = "팔꿈치를 완전히 잠그고, 삼두근에 힘을 주어 바닥을 강하게 밀어내세요.",
     )
 
+    /**
+     * Initial estimates, to be calibrated with tuning videos (튜닝 영상으로 보정). All rules read the signed θ = 180 + dev.
+     * Shoulder and elbow flex toward − (shoulder/elbow behind the a–c line), so BELOW is 어깨 닫힘 / 팔꿈치 굽힘;
+     * mild hyperextension up to [AngleThreshold.Range.max] is allowed and ABOVE maps to no fault.
+     */
     val rules = listOf(
         PoseRule(
             id = ALIGNMENT,
@@ -67,14 +72,14 @@ object HandstandKnowledge {
             id = SHOULDER_OPEN,
             name = "어깨 열림",
             joints = listOf(Joint.ELBOW, Joint.SHOULDER, Joint.HIP),
-            threshold = AngleThreshold.Range(min = 165f, max = 180f),
+            threshold = AngleThreshold.Range(min = 165f, max = 195f),
             faults = mapOf(Violation.BELOW to CLOSED_SHOULDER),
         ),
         PoseRule(
             id = ELBOW_LOCK,
             name = "팔꿈치 펴짐",
             joints = listOf(Joint.WRIST, Joint.ELBOW, Joint.SHOULDER),
-            threshold = AngleThreshold.Range(min = 170f, max = 180f),
+            threshold = AngleThreshold.Range(min = 170f, max = 190f),
             faults = mapOf(Violation.BELOW to BENT_ELBOW),
         ),
     )

@@ -27,6 +27,7 @@ class FaultEvaluatorTest {
         assertEquals(H.BANANA, segments[0].fault)
         assertEquals(102..104, segments[0].range)
         assertEquals(15f, segments[0].peakDeviation, 0.01f)
+        assertEquals(5f, segments[0].boundaryExcess, 0.01f)
     }
 
     @Test
@@ -47,9 +48,16 @@ class FaultEvaluatorTest {
     fun rangeRulesFlagBelowMin() {
         val segment = evaluate(timeline(5, mapOf(H.ELBOW_LOCK to span(0..2, 160f)))).single()
         assertEquals(H.BENT_ELBOW, segment.fault)
-        assertEquals(-10f, segment.peakDeviation, 0.01f)
+        assertEquals(-20f, segment.peakDeviation, 0.01f)
+        assertEquals(10f, segment.boundaryExcess, 0.01f)
         assertEquals(mapOf(H.ELBOW_LOCK to 160f), segment.angles)
         assertEquals(H.CLOSED_SHOULDER, evaluate(timeline(5, mapOf(H.SHOULDER_OPEN to span(1..3, 150f)))).single().fault)
+    }
+
+    @Test
+    fun rangeRulesIgnoreHyperextensionAboveMax() {
+        assertTrue(evaluate(timeline(5, mapOf(H.ELBOW_LOCK to span(0..4, 188f), H.SHOULDER_OPEN to span(0..4, 192f)))).isEmpty())
+        assertTrue(evaluate(timeline(5, mapOf(H.ELBOW_LOCK to span(0..4, 200f), H.SHOULDER_OPEN to span(0..4, 205f)))).isEmpty())
     }
 
     @Test
@@ -60,6 +68,7 @@ class FaultEvaluatorTest {
         assertEquals(100..108, segment.range)
         assertEquals(mapOf(H.ALIGNMENT to 165f, H.HIP to 160f), segment.angles)
         assertEquals(-20f, segment.peakDeviation, 0.01f)
+        assertEquals(5f, segment.boundaryExcess, 0.01f)
     }
 
     @Test

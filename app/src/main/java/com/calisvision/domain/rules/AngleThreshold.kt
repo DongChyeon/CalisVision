@@ -1,7 +1,7 @@
 package com.calisvision.domain.rules
 
 sealed interface AngleThreshold {
-    /** Applies to unsigned angles (0..180). */
+    /** Applies to the signed angle θ = 180 + dev; below [min] and above [max] are separate violations. */
     data class Range(val min: Float, val max: Float) : AngleThreshold
 
     /** Applies to signed deviation dev = θ − 180; + is extension, − is flexion. */

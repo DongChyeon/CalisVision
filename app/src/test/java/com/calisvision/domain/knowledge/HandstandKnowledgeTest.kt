@@ -19,8 +19,8 @@ class HandstandKnowledgeTest {
         val byId = rules.associateBy { it.id }
         assertEquals(AngleThreshold.Deviation(10f, 10f), byId.getValue(HandstandKnowledge.ALIGNMENT).threshold)
         assertEquals(AngleThreshold.Deviation(15f, 15f), byId.getValue(HandstandKnowledge.HIP).threshold)
-        assertEquals(AngleThreshold.Range(165f, 180f), byId.getValue(HandstandKnowledge.SHOULDER_OPEN).threshold)
-        assertEquals(AngleThreshold.Range(170f, 180f), byId.getValue(HandstandKnowledge.ELBOW_LOCK).threshold)
+        assertEquals(AngleThreshold.Range(165f, 195f), byId.getValue(HandstandKnowledge.SHOULDER_OPEN).threshold)
+        assertEquals(AngleThreshold.Range(170f, 190f), byId.getValue(HandstandKnowledge.ELBOW_LOCK).threshold)
     }
 
     @Test

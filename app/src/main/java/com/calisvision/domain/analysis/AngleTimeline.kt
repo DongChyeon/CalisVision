@@ -3,12 +3,11 @@ package com.calisvision.domain.analysis
 import com.calisvision.domain.geometry.AngleCalculator
 import com.calisvision.domain.geometry.BodyOrientation
 import com.calisvision.domain.model.FramePose
-import com.calisvision.domain.rules.AngleThreshold
 import com.calisvision.domain.rules.Exercise
 import com.calisvision.domain.rules.PoseRule
 import com.calisvision.domain.rules.RuleId
 
-/** Deviation rules hold the signed angle θ = 180 + dev, Range rules the unsigned angle; null when landmarks are missing. */
+/** Every rule holds the signed angle θ = 180 + dev; null when landmarks are missing. */
 data class AngleFrame(
     val sampleIndex: Int,
     val displayTimeMs: Long,
@@ -36,10 +35,7 @@ data class AngleTimeline(val frames: List<AngleFrame>) {
 
         private fun measure(pose: FramePose, rule: PoseRule, orientation: BodyOrientation, aspect: Float): Float? {
             val p = rule.joints.map { pose[orientation.side, it] ?: return null }
-            return when (rule.threshold) {
-                is AngleThreshold.Deviation -> AngleCalculator.signedAngle(p[0], p[1], p[2], aspect, orientation.frontSign)
-                is AngleThreshold.Range -> AngleCalculator.angle(p[0], p[1], p[2], aspect)
-            }
+            return AngleCalculator.signedAngle(p[0], p[1], p[2], aspect, orientation.frontSign)
         }
     }
 }
