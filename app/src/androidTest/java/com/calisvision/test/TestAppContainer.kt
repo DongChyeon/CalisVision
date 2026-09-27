@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContract
+import com.calisvision.data.AnalysisSessionStore
 import com.calisvision.data.AppContainer
 import com.calisvision.domain.analysis.AngleTimeline
 import com.calisvision.domain.model.AnalysisResult
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.flowOf
 class TestAppContainer(
     override val analyzer: VideoAnalyzer = FakeAnalyzer(),
     override val pickVideo: FakePickVideo = FakePickVideo(),
+    override val sessions: AnalysisSessionStore = AnalysisSessionStore(),
 ) : AppContainer
 
 /** Returns [result] synchronously instead of opening the system picker; [launches] counts picker opens. */

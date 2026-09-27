@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -11,6 +12,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.calisvision.data.AppContainer
 import com.calisvision.domain.knowledge.ExerciseCatalog
+import com.calisvision.ui.analysis.AnalysisScreen
+import com.calisvision.ui.analysis.AnalysisViewModel
 import com.calisvision.ui.guide.ShootingGuideScreen
 import com.calisvision.ui.home.HomeScreen
 
@@ -19,10 +22,13 @@ object Routes {
     const val HOME = "home"
     const val GUIDE = "guide/{exerciseId}"
     const val ANALYSIS = "analysis/{exerciseId}?uri={uri}"
+    const val RESULT = "result/{sessionId}"
 
     fun guide(exerciseId: String) = "guide/$exerciseId"
 
     fun analysis(exerciseId: String, uri: Uri) = "analysis/$exerciseId?uri=${Uri.encode(uri.toString())}"
+
+    fun result(sessionId: String) = "result/$sessionId"
 }
 
 @Composable
@@ -54,8 +60,29 @@ fun CalisNavHost(container: AppContainer) {
                 navArgument("uri") { type = NavType.StringType },
             ),
         ) { entry ->
-            // Placeholder until the analysis screen lands (P3-2).
-            Text(entry.arguments?.getString("uri").orEmpty())
+            val exercise = ExerciseCatalog.byId(entry.arguments?.getString("exerciseId").orEmpty())
+            val uri = entry.arguments?.getString("uri")?.let(Uri::parse)
+            if (exercise == null || uri == null) {
+                LaunchedEffect(Unit) { goHome() }
+                return@composable
+            }
+            AnalysisScreen(
+                viewModel = viewModel { AnalysisViewModel(container.analyzer, container.sessions, uri, exercise) },
+                onCompleted = { sessionId ->
+                    nav.navigate(Routes.result(sessionId)) { popUpTo(Routes.ANALYSIS) { inclusive = true } }
+                },
+                onExit = { goHome() },
+            )
+        }
+        composable(Routes.RESULT, arguments = listOf(navArgument("sessionId") { type = NavType.StringType })) { entry ->
+            val session = container.sessions[entry.arguments?.getString("sessionId").orEmpty()]
+            if (session == null) {
+                // Process death drops in-memory results; there is nothing to restore.
+                LaunchedEffect(Unit) { goHome() }
+                return@composable
+            }
+            // Placeholder until the result screen lands (P3-3).
+            Text(session.id)
         }
     }
 }

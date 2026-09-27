@@ -28,4 +28,18 @@
     <string name="guide_tip_hold_body">10–20초 영상이면 충분합니다</string>
     <string name="guide_faults_covered">이 촬영으로 확인하는 자세</string>
     <string name="guide_pick_video">갤러리에서 영상 고르기</string>
+
+    <!-- 분석 진행 -->
+    <string name="analysis_title">분석 중</string>
+    <string name="analysis_step_orientation">방향 판정</string>
+    <string name="analysis_step_frames">프레임 분석</string>
+    <string name="analysis_step_running">진행 중</string>
+    <string name="analysis_step_waiting">대기</string>
+    <string name="analysis_step_done">완료</string>
+    <string name="analysis_frames_count">%1$d / %2$d</string>
+    <string name="analysis_keep_screen_on">화면을 켜 둔 채 기다려 주세요. 30초 영상은 약 1분 걸립니다.</string>
+    <string name="analysis_cancel">분석 취소</string>
+    <string name="analysis_failed_title">분석하지 못했습니다</string>
+    <string name="analysis_failed_body">영상을 읽거나 자세를 찾지 못했습니다. 촬영 가이드대로 찍은 영상인지 확인해 주세요.</string>
+    <string name="analysis_failed_home">홈으로</string>
 </resources>

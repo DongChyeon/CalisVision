@@ -13,5 +13,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val analyzer: VideoAnalyzer by lazy { DefaultVideoAnalyzer(appContext) }
 
+    override val sessions = AnalysisSessionStore()
+
     override val pickVideo: ActivityResultContract<PickVisualMediaRequest, Uri?> = ActivityResultContracts.PickVisualMedia()
 }

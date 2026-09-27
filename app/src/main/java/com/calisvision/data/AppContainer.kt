@@ -8,6 +8,8 @@ import com.calisvision.video.VideoAnalyzer
 interface AppContainer {
     val analyzer: VideoAnalyzer
 
+    val sessions: AnalysisSessionStore
+
     /** Gallery picker; replaceable so instrumented tests can return a video without the system UI. */
     val pickVideo: ActivityResultContract<PickVisualMediaRequest, Uri?>
 }
