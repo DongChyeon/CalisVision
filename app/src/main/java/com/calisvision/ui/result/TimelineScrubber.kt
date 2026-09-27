@@ -83,7 +83,7 @@ fun TimelineScrubber(
                     }
                 }
                 .pointerInput(sampleCount) {
-                    fun cell(x: Float) = (x / size.width * sampleCount).toInt().coerceIn(0, last)
+                    fun cell(x: Float) = sampleAt(x, size.width.toFloat(), sampleCount)
                     detectTapGestures { offset ->
                         val index = cell(offset.x)
                         seek(index)
@@ -92,7 +92,7 @@ fun TimelineScrubber(
                     }
                 }
                 .pointerInput(sampleCount) {
-                    fun cell(x: Float) = (x / size.width * sampleCount).toInt().coerceIn(0, last)
+                    fun cell(x: Float) = sampleAt(x, size.width.toFloat(), sampleCount)
                     detectHorizontalDragGestures(onDragStart = { seek(cell(it.x)) }) { change, _ -> seek(cell(change.position.x)) }
                 },
         ) {
@@ -133,6 +133,10 @@ fun TimelineScrubber(
         }
     }
 }
+
+/** The sample whose cell contains [x] on a track [width] wide split into [sampleCount] equal cells; clamped to the track. */
+fun sampleAt(x: Float, width: Float, sampleCount: Int): Int =
+    if (sampleCount == 0 || width <= 0f) 0 else floor(x / width * sampleCount).toInt().coerceIn(0, sampleCount - 1)
 
 /** Seconds per sample, for time labels. */
 const val SAMPLE_SECONDS = FrameSource.SAMPLE_INTERVAL_MS / 1000f

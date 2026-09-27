@@ -79,6 +79,7 @@ fun FaultSheet(fault: FaultSegment, rules: List<PoseRule>, onDismiss: () -> Unit
     ) {
         Column(
             Modifier
+                .testTag("fault_sheet")
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = CalisTheme.spacing.s20)
                 .padding(bottom = CalisTheme.spacing.s24)
