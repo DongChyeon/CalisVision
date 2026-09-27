@@ -182,3 +182,57 @@ AlignmentGateResult(passed=false, ratio=0.19148937, holdSamples=47, reason=hold 
 - heavy는 두 delegate 모두 4규칙 관절 visibility가 0.66–0.69로 떨어져(가시성 기준 미달 프레임 증가) tune 홀드를 잃거나(CPU) 크게 줄이고(GPU 18..55), 팔꿈치 Δθ 5.6°. heavy-CPU는 NFR 초과. 기각.
 - P1.5 기록의 30 s 55.5 s는 연속 실행 끝의 발열 상태 값(추론 147 ms)이었고, 이번 측정은 추론 105–115 ms 상태다.
 - `MediaPipePoseDetector`는 모델 경로·delegate 인자(기본 full·CPU)와 CPU 폴백을 갖는다 — 벤치마크용 seam이며 프로덕션 기본값은 변화 없음.
+
+## 비행기 모드 (§6-7, AC-5 수동)
+
+`adb shell cmd connectivity airplane-mode enable` + `adb shell svc wifi disable`(이 기기는 비행기 모드에서도 Wi-Fi 연결을 유지해 첫 시도 때 `ping 8.8.8.8` 성공 → 두 번째부터 Wi-Fi도 끔) → `Active default network: none`, `ping: Network is unreachable` 확인 → `DeviceSmokeTest`(실제 `DefaultVideoAnalyzer`로 tune 영상 홈→가이드→선택→분석→결과→결함 시트) → trap으로 복구(`airplane=0 wifi=1` 확인).
+
+- 결과: **PASS** — `DeviceSmokeTest` 1 tests, 0 failures, 47.5 s, 테스트 종료 시점에도 `Active default network: none`.
+- (중간 1회 실패는 화면 잠금으로 Compose 계층이 없던 것 — 잠금 해제 후 재실행. 네트워크와 무관.)
+
+## APK
+
+- `app-debug.apk` 101,769,659 B(97.1 MB) — 4개 ABI의 `libmediapipe_tasks_jni.so`(arm64 11.0 MB, x86 15.6 MB, x86_64 13.7 MB, armeabi-v7a 7.7 MB) + 모델 9.4 MB가 대부분. ABI split/릴리스 축소는 미적용.
+- `aapt2 dump permissions`: `com.calisvision.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`만 존재, **INTERNET 행 0**.
+
+## AC 대조표 (2026-09-27, 커밋 `459cae6`·`3a23e3c` 기준)
+
+| AC | 상태 | 근거 |
+|---|---|---|
+| AC-1 검출 ≥ 90% | PASS | tune 131/131, hold-out 177/177, tune_30s 301/301 (`WallHandstandInstrumentedTest`, `ModelDelegateBenchmarkTest`); rot180 사본 100% (P1.5) |
+| AC-2 4규칙 각도/null | PASS | `AngleTimelineTest`, 결과 패널 4행(`DeviceSmokeTest` 스크린샷) |
+| AC-3 FaultSegment ≥ 3샘플·부호별·병합 | PASS | `FaultEvaluatorTest`, `FaultSheetTest.mergedPikeShowsBothRuleAngles` |
+| AC-4 hold-out 정렬 게이트 | **FAIL** | `WallHandstandAlignmentTest`: 홀드 130..176 = 47 < 50 샘플, θ∈[175,185] 19.1%(평균 190.9°). tune도 43.6% — 위 "AC-4" 참고. fixture 미커밋(사용자 결정) |
+| AC-5 INTERNET 0 · 비행기 모드 | PASS | aapt2 INTERNET 0; 비행기 모드+Wi-Fi off `DeviceSmokeTest` PASS |
+| AC-6 화면 전환 | PASS | `NavigationFlowTest.homeToGuideToPickerToResult` |
+| AC-7 스크러버 1 step = 1 샘플, 동기 | PASS | `ResultViewModelTest.stepMovesExactlyOneSampleAndKeepsFrameSkeletonAnglesInSync`, `scrubberCellWidthIsOneSample`; 이미지·스켈레톤 겹침은 `DeviceSmokeTest` 스크린샷 육안 |
+| AC-8 결함 띠·탭 시 결함명·힌트 | PASS | `FaultSheetTest.tappingBananaOpensSheetWithHint` |
+| AC-9 임계값 변경 → 재분석 0회 | PASS | `ResultViewModelTest.thresholdChangeUpdatesFaultsWithoutReanalysis` |
+| AC-9b 앱 내 촬영 | 미검증 | 후순위 — 촬영 기능 미구현 |
+| AC-10 knowledge non-blank | PASS | `HandstandKnowledgeTest` |
+| AC-11 선택기 전 가이드 | PASS | `NavigationFlowTest` |
+| AC-12 dummy Exercise 확장 | PASS | `ExerciseCatalogTest` |
+| AC-13 PRD 5개 섹션 | PASS | §6-1 `grep -c` = 5 |
+| AC-14 REQUIREMENTS AC 참조 | PASS | §6-1 루프 출력 없음 |
+| AC-15 ADR ≥ 5, 9개 섹션 | PASS | ADR 7개, `grep -L` 출력 없음 |
+| AC-16 민감 파일 무시 | PASS | `git check-ignore` 10행, porcelain grep exit=1 |
+
+요약: PASS 15, FAIL 1(AC-4), 수동 0(AC-5 비행기 모드·AC-7 육안은 수행 완료로 PASS에 포함), 미검증 1(AC-9b).
+
+전역 검사: `./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest` green(JVM 73 tests, skip 1 = hold-out fixture 없는 `WallHandstandAlignmentTest`), domain 경계 import 0, INTERNET 0. 영상 없는 instrumented(`notAnnotation=RequiresVideo`): SmokeTest 1 · FaultSheetTest 2 · NavigationFlowTest 3, 실패 0.
+
+## NFR
+
+- NFR-2 30 s 영상 ≤ 60 s: **PASS** — full-CPU 연속 3회 42.0 / 42.1 / 43.0 s(여유 17 s), 단일 39.9 s. 실제 앱 경로(프레임 JPEG 저장 포함) 13 s tune 22.9 s, 17.7 s hold-out 29.9 s.
+- 힙 ≤ 256 MB: 미측정.
+
+## 알려진 한계
+
+- **AC-4 FAIL** — 두 기준 영상 모두 정렬 게이트 미달, hold-out 홀드 47 샘플. 재촬영 또는 게이트 재정의 필요(사용자 결정).
+- **낮은 카메라 각도**: 두 영상 모두 바닥 근처에서 올려다보는 구도(가이드의 엉덩이 높이와 다름) — 2D 원근으로 각도가 왜곡될 수 있다. tune은 손이 벽에서 떨어져 몸이 ~19° 기운 자세라 어깨 닫힘이 전 구간 결함으로 나온다.
+- hold-out 팔꿈치 θ 255–281°(물리적으로 불가능) — landmark 오류로 추정, 원인 미조사(hold-out 동결).
+- **단일 기기**(SM-F766N, Android 16)에서만 측정. 성능·`setRotationDegrees` 동작·GPU 가용성은 기기 의존.
+- **CFR·8-bit 4:2:0 가정**(`CodecFrameSource`): VFR은 샘플 시각이 어긋날 수 있고 10-bit/HDR 미지원.
+- **결과는 메모리에만 보관**(`AnalysisSessionStore`) — 프로세스 종료 시 사라짐. 프레임 JPEG는 캐시 디렉터리.
+- heavy 모델은 이 영상에서 visibility가 떨어져 부적합, GPU는 이득이 작아 미채택(위 "모델·가속 비교").
+- §6-8 별도 lane verifier/code-reviewer의 AC 대조 승인은 이 문서 작성 이후 단계.
