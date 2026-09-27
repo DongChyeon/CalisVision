@@ -34,7 +34,7 @@ object HandstandKnowledge {
         id = "anterior_pelvic_tilt",
         name = "골반 전방경사",
         description = "골반이 앞으로 기울어 허리가 젖혀져 있습니다. 요추에 압박이 집중됩니다.",
-        correctionHint = "꼬리뼈를 말아 넣듯 골반을 후방경사시키고, 복부와 엉덩이를 동시에 조이세요.",
+        correctionHint = "꼬리뼈를 말아 넣듯 골반을 후방경사시키고 복부와 엉덩이를 동시에 조이세요.",
     )
     val CLOSED_SHOULDER = PoseFault(
         id = "closed_shoulder",
@@ -46,7 +46,7 @@ object HandstandKnowledge {
         id = "bent_elbow",
         name = "팔꿈치 굽힘",
         description = "팔꿈치가 굽어 있어 팔로 체중을 지지하는 힘이 새고 버티기 어렵습니다.",
-        correctionHint = "팔꿈치를 완전히 잠그고, 삼두근에 힘을 주어 바닥을 강하게 밀어내세요.",
+        correctionHint = "팔꿈치를 완전히 잠그고 삼두근에 힘을 주어 바닥을 강하게 밀어내세요.",
     )
 
     /**
@@ -101,7 +101,7 @@ object HandstandKnowledge {
         shootingGuide = ShootingGuide(
             view = "측면",
             faultsCovered = listOf(BANANA.name, PIKE.name, ANTERIOR_TILT.name, CLOSED_SHOULDER.name, BENT_ELBOW.name),
-            instruction = "몸의 옆면이 보이도록 카메라를 두세요. 삼각대를 엉덩이 높이에 놓고 2–3m 떨어져, 손끝부터 발끝까지 전신이 프레임 안에 들어오고 손목·발목이 가려지지 않게 촬영하세요.",
+            instruction = "몸의 옆면이 보이도록 카메라를 두세요. 삼각대를 엉덩이 높이에 놓고 2–3m 떨어지세요. 손끝부터 발끝까지 전신이 프레임 안에 들어오고 손목·발목이 가려지지 않게 촬영하세요.",
         ),
     )
 
