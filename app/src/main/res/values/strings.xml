@@ -37,6 +37,8 @@
     <string name="analysis_step_waiting">대기</string>
     <string name="analysis_step_done">완료</string>
     <string name="analysis_frames_count">%1$d / %2$d</string>
+    <string name="analysis_file_fallback">선택한 영상</string>
+    <string name="analysis_remaining">약 %1$d초 남음</string>
     <string name="analysis_keep_screen_on">화면을 켜 둔 채 기다려 주세요. 30초 영상은 약 1분 걸립니다.</string>
     <string name="analysis_cancel">분석 취소</string>
     <string name="analysis_failed_title">분석하지 못했습니다</string>

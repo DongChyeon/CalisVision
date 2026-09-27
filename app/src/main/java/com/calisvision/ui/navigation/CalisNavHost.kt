@@ -3,6 +3,7 @@ package com.calisvision.ui.navigation
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -13,6 +14,7 @@ import com.calisvision.data.AppContainer
 import com.calisvision.domain.knowledge.ExerciseCatalog
 import com.calisvision.ui.analysis.AnalysisScreen
 import com.calisvision.ui.analysis.AnalysisViewModel
+import com.calisvision.ui.analysis.queryDisplayName
 import com.calisvision.ui.guide.ShootingGuideScreen
 import com.calisvision.ui.home.HomeScreen
 import com.calisvision.ui.result.ResultScreen
@@ -73,8 +75,11 @@ fun CalisNavHost(container: AppContainer) {
                 LaunchedEffect(Unit) { goHome() }
                 return@composable
             }
+            val resolver = LocalContext.current.contentResolver
             AnalysisScreen(
-                viewModel = viewModel { AnalysisViewModel(container.analyzer, container.sessions, uri, exercise) },
+                viewModel = viewModel {
+                    AnalysisViewModel(container.analyzer, container.sessions, uri, exercise, displayName = { queryDisplayName(resolver, uri) })
+                },
                 onCompleted = { sessionId ->
                     nav.navigate(Routes.result(sessionId)) { popUpTo(Routes.ANALYSIS) { inclusive = true } }
                 },
