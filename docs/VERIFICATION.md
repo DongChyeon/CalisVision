@@ -111,3 +111,51 @@
 6. ~~`HoldSegmentDetector` 경계가 ±1 LSB 수준 입력 변화에도 크게 흔들림(28..121 ↔ 41..130)~~ — 2단계로 교체: 기존 창 판정(15샘플, 범위 < 2%)의 최장 구간은 시드로만 쓰고, 시드의 손목·발목 중앙값 자세에서 x·y 모두 3% 이내인 프레임의 최장 연속 구간을 홀드로 반환(가시성 미달·미검출 프레임은 여전히 끊음). 창 범위는 홀드 중에도 2% 근처(1.9–2.2%)를 오가 잡음에 뒤집히지만, 중앙값 자세와의 거리는 진입(샘플 13→14에서 5.3% → 2.1%)·종료에서 여유가 크다. tune fixture 결과 **14..130**(117 샘플), 가우시안 σ 0.002 잡음 사본 24개(seed 1–24)에서 시작·끝 변동 **0 샘플**(시드 구간 자체는 같은 조건의 Python 재현에서 시작 26–51, 끝 120–130으로 흔들림) — `HoldSegmentDetectorTest.tuneFixtureBoundariesSurviveLandmarkNoise`.
 4. 가이드 구도(엉덩이 높이 카메라) 영상 추가 확보.
 5. P4: hold-out fixture를 테스트 리소스로 옮겨 `WallHandstandAlignmentTest`(AC-4) 실행.
+
+---
+
+# P4 — 검증·보정
+
+- 일자: 2026-09-27, 기기 SM-F766N(Android 16), `develop`, 모델 `pose_landmarker_full.task` CPU
+- 파라미터 동결 상태에서 실행(임계값·스무딩(중앙값 5)·`HoldSegmentDetector`·규칙 변경 없음). hold-out은 **1회만** 평가.
+
+## AC-4 — hold-out 판정: **FAIL**
+
+경로: `WallHandstandInstrumentedTest`(`@RequiresVideo`, 프로덕션 `DefaultVideoAnalyzer` = CodecFrameSource → OrientationResolver → PoseLandmarkerEngine → `AnalysisResult.assemble`)가 fixture를 `getExternalFilesDir("fixtures")`에 export → `adb pull` → `./gradlew testDebugUnitTest --tests "*WallHandstandAlignmentTest"`(실행됨, skip 아님).
+
+```
+hold segment 130..176: 47 samples
+AlignmentGateResult(passed=false, ratio=0.19148937, holdSamples=47, reason=hold 47 < 50 samples)
+```
+
+| 항목 | hold-out (AC-4) | tune (참고) |
+|---|---|---|
+| 샘플 / 검출 | 177 / 177 | 131 / 131 |
+| 선택 회전 · side · frontSign | 0° · LEFT · +1 | 0° · LEFT · +1 |
+| 홀드 구간 (길이) | **130..176 (47) < 50 → FAIL** | 14..130 (117) |
+| 스무딩 정렬 θ ∈ [175,185] (null 0) | **19.1%** < 95% | 43.6% < 95% |
+| 정렬 θ 평균 / 최소 / 최대 | 190.9 / 181.2 / 197.5 | 177.7 / 169.8 / 188.6 |
+| 골반/허리 평균 (최소–최대) | 189.3 (181.4–194.1) | 182.3 (173.0–192.8) |
+| 어깨 열림 평균 (최소–최대) | 156.9 (150.3–160.4) | 157.4 (148.9–162.8) |
+| 팔꿈치 평균 (최소–최대) | 267.5 (255.1–280.7) | 197.0 (190.9–205.3) |
+| 분석 시간 (프레임 JPEG 저장 포함) | 29.9 s (17.7 s 영상) | 22.9 s (13.0 s 영상) |
+
+홀드 구간 안 결함(`ResultViewModel`과 같은 규칙: `isInHold` ≥ 3샘플 겹침 후 `FaultEvaluator.clip`):
+
+| 영상 | 결함 (clip된 범위, 최대 편차) |
+|---|---|
+| hold-out | 어깨 닫힘 `closed_shoulder` 130..176 (−29.7°), 바나나 등 `banana_back` 141..148 (+12.8°), 156..176 (+17.5°) |
+| tune | 어깨 닫힘 `closed_shoulder` 14..130 (−31.1°), 파이크 `pike` 89..91 (−10.2°) |
+
+- 홀드 구간 밖(목록 미표시): hold-out `closed_shoulder` 0..13, `pike` 0..2, `banana_back` 99..108; tune `pike` 0..7.
+- hold-out 홀드 구간은 영상 마지막 샘플(176 = 17.6 s)에서 끝난다 — 13.0 s 이후만 홀드로 잡혔다. hold-out 팔꿈치 267°는 물리적으로 불가능한 값(landmark 오류 추정)이지만 ABOVE는 결함 미매핑이라 결함 목록에는 영향 없음. hold-out은 동결 규칙에 따라 더 들여다보지 않았다.
+- fixture: `wall_handstand_holdout.json`은 **커밋하지 않았다**(커밋하면 `testDebugUnitTest`가 AC-4로 red). 사용자 결정 대기 — 아래 "진단" 참고.
+- tune fixture 재export는 기존 fixture와 landmark 평균 |Δ| 0.0023(최대 0.051), 검출 차이 0, 홀드 14..130 동일 → 실행 간 잡음 수준이라 갱신하지 않음.
+
+### 진단 (tune 영상만 사용)
+
+- **tune도 같은 게이트에서 실패한다(43.6% < 95%)** — hold-out 고유 문제가 아니다. 현재 파라미터로 [175,185] 95%를 통과할 영상이 없다.
+- tune 홀드 동안 스무딩 정렬 θ는 181 → 188.6(진입 직후 ~1 s, 바나나 쪽) → 183–185 유지(~3.5 s) → 170 부근(−10°, 파이크 경계)으로 ~4 s → 176.8로 끝난다. 즉 실제 자세가 홀드 중 ±9° 움직이고, 게이트 폭 ±5°를 95% 유지하지 못한다. 스무딩 전(raw) 비율도 43.6%로 같아 jitter가 원인이 아니다.
+- P1.5 육안 확인과 일치: tune은 손이 벽에서 떨어져 몸이 벽 쪽으로 ~19° 기운 벽 물구나무(어깨 닫힘 −23°)이고 카메라가 바닥 근처에서 올려다보는 구도다(가이드 "엉덩이 높이"와 다름) — 2D 원근으로 정렬 각이 왜곡될 수 있다.
+- tune 홀드도 영상 마지막 샘플(130)까지 이어진다 — 두 영상 모두 홀드 중에 녹화가 끝나, 홀드 길이는 "홀드 시작 후 녹화가 얼마나 이어졌나"에 좌우된다.
+- 선택지(사용자 결정): (1) 가이드 구도(엉덩이 높이, 몸과 수직, 홀드 7 s 이상, 홀드가 끝난 뒤 녹화 종료)로 새 hold-out 재촬영, (2) AC-4 게이트(폭 [175,185]/95%) 재정의 ADR, (3) 현 결과를 FAIL로 확정하고 fixture 커밋(테스트 red 유지). 파라미터를 재보정한다면 새 hold-out이 필요하다(이 hold-out은 이미 평가·열람됨).
