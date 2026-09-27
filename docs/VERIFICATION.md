@@ -254,21 +254,21 @@ ReferenceHoldGateResult(passed=true, reasons=[], holdSamples=116, nullSamples=0,
 
 ## APK
 
-- `app-debug.apk` 101,769,659 B(97.1 MB) — 4개 ABI의 `libmediapipe_tasks_jni.so`(arm64 11.0 MB, x86 15.6 MB, x86_64 13.7 MB, armeabi-v7a 7.7 MB) + 모델 9.4 MB가 대부분. ABI split/릴리스 축소는 미적용.
+- `app-debug.apk` 101,770,583 B(97.1 MB, 커밋 `360f390` 빌드) — 4개 ABI의 `libmediapipe_tasks_jni.so`(arm64 11.0 MB, x86 15.6 MB, x86_64 13.7 MB, armeabi-v7a 7.7 MB) + 모델 9.4 MB가 대부분. ABI split/릴리스 축소는 미적용.
 - `aapt2 dump permissions`: `com.calisvision.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`만 존재, **INTERNET 행 0**.
 
-## AC 대조표 (2026-09-27, 커밋 `459cae6`·`3a23e3c` 기준)
+## AC 대조표 (2026-09-27, 커밋 `360f390` 기준)
 
 | AC | 상태 | 근거 |
 |---|---|---|
-| AC-1 검출 ≥ 90% | PASS | tune 131/131, hold-out 177/177, holdout3 140/140, tune_30s 301/301 (`WallHandstandInstrumentedTest`, `ModelDelegateBenchmarkTest`); rot180 사본 100% (P1.5) |
+| AC-1 검출 ≥ 90% | PASS | **커밋된 fixture(재현 가능)**: tune `wall_handstand_tune.json` 131/131, hold-out `wall_handstand_holdout.json`(holdout3) 140/140 — 검출 프레임 수는 fixture의 non-null `landmarks`. **기기 로그만(fixture 미커밋)**: tune_30s(30 s 영상) 301/301 (`ModelDelegateBenchmarkTest`), 첫 hold-out 177/177 (`WallHandstandInstrumentedTest`, 손 가림 영상), rot180 사본 100% (P1.5) |
 | AC-2 4규칙 각도/null | PASS | `AngleTimelineTest`, 결과 패널 4행(`DeviceSmokeTest` 스크린샷) |
 | AC-3 FaultSegment ≥ 3샘플·부호별·병합 | PASS | `FaultEvaluatorTest`, `FaultSheetTest.mergedPikeShowsBothRuleAngles` |
 | AC-4 hold-out 정렬 게이트 | **PASS** (ADR-0008 재정의) | holdout3 `WallHandstandAlignmentTest`(`ReferenceHoldGate`, fixture 커밋·skip 없음): 홀드 24..139 = 116 샘플, null 0, 홀드 안 정렬 결함 0건, 평균 θ 184.9°(181.9–189.2). strict 지표(정보용, 원래 기준): θ∈[175,185] 61.2% < 95% → 원래 기준으로는 FAIL. 첫 hold-out strict FAIL 19.1%(손 가림), holdout2 평가 전 기각(발목 프레임 밖) |
 | AC-5 INTERNET 0 · 비행기 모드 | PASS | aapt2 INTERNET 0; 비행기 모드+Wi-Fi off `DeviceSmokeTest` PASS |
-| AC-6 화면 전환 | PASS | `NavigationFlowTest.homeToGuideToPickerToResult` |
+| AC-6 화면 전환 | PASS | `NavigationFlowTest.homeToGuideToPickerToResult` — `FakeAnalyzer`가 `Processing(1,2)` 후 `CompletableDeferred`로 `Completed`를 붙잡은 동안 진행 화면("분석 중", "1 / 2") 표시·결과 화면 부재를 확인한 뒤 해제 → 결과 화면 |
 | AC-7 스크러버 1 step = 1 샘플, 동기 | PASS | `ResultViewModelTest.stepMovesExactlyOneSampleAndKeepsFrameSkeletonAnglesInSync`, `scrubberCellWidthIsOneSample`; 이미지·스켈레톤 겹침은 `DeviceSmokeTest` 스크린샷 육안 |
-| AC-8 결함 띠·탭 시 결함명·힌트 | PASS | `FaultSheetTest.tappingBananaOpensSheetWithHint` |
+| AC-8 결함 띠·탭 시 결함명·힌트 | PASS | `FaultSheetTest.timelineBandsRenderAndTappingInHoldBandOpensSheet` — 타임라인 띠 3개(`timeline_band`, 홀드 안 `timeline_band_listed` 2개) 렌더링, 홀드 밖 파이크 띠 탭 → 시트 없음, 홀드 안 바나나 띠 탭 → 시트에 결함명·교정 힌트; `FaultSheetTest.tappingBananaOpensSheetWithHint`(목록 탭) |
 | AC-9 임계값 변경 → 재분석 0회 | PASS | `ResultViewModelTest.thresholdChangeUpdatesFaultsWithoutReanalysis` |
 | AC-9b 앱 내 촬영 | 미검증 | 후순위 — 촬영 기능 미구현 |
 | AC-10 knowledge non-blank | PASS | `HandstandKnowledgeTest` |
@@ -279,14 +279,14 @@ ReferenceHoldGateResult(passed=true, reasons=[], holdSamples=116, nullSamples=0,
 | AC-15 ADR ≥ 5, 9개 섹션 | PASS | ADR 8개, `grep -L` 출력 없음 |
 | AC-16 민감 파일 무시 | PASS | `git check-ignore` 10행, porcelain grep exit=1 |
 
-요약(ADR-0008 반영): PASS 16(AC-4는 재정의 기준), FAIL 0, 수동 0(AC-5 비행기 모드·AC-7 육안은 수행 완료로 PASS에 포함), 미검증 1(AC-9b).
+요약(ADR-0008 반영, AC 17행): PASS 16(AC-4는 재정의 기준), FAIL 0, 수동 0(AC-5 비행기 모드·AC-7 육안은 수행 완료로 PASS에 포함), 미검증 1(AC-9b). NFR: 성능(NFR-2, 30 s ≤ 60 s) PASS, 힙(NFR-3, Java heap 34.8 MB ≤ 256 MB) PASS — 아래 "NFR".
 
-전역 검사: `./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest` green(JVM 79 tests, skip 0 — hold-out fixture 커밋으로 `WallHandstandAlignmentTest` 실행), domain 경계 import 0, INTERNET 0. 영상 없는 instrumented(`notAnnotation=RequiresVideo`): SmokeTest 1 · FaultSheetTest 2 · NavigationFlowTest 3, 실패 0.
+전역 검사: `./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest` green(JVM 79 tests, skip 0 — hold-out fixture 커밋으로 `WallHandstandAlignmentTest` 실행), domain 경계 import 0, INTERNET 0. 영상 없는 instrumented(`notAnnotation=RequiresVideo`): SmokeTest 1 · FaultSheetTest 3 · NavigationFlowTest 3 = 7, 실패 0.
 
 ## NFR
 
 - NFR-2 30 s 영상 ≤ 60 s: **PASS** — full-CPU 연속 3회 42.0 / 42.1 / 43.0 s(여유 17 s), 단일 39.9 s. 실제 앱 경로(프레임 JPEG 저장 포함) 13 s tune 22.9 s, 17.7 s hold-out 29.9 s.
-- 힙 ≤ 256 MB: **PASS** — Java Heap 최고치 34.8 MB(상한 256 MB, 여유 221 MB). 상세는 위 "메모리 (NFR 힙 ≤ 256MB)".
+- NFR-3 힙 ≤ 256 MB: **PASS** — Java Heap 최고치 34.8 MB(상한 256 MB, 여유 221 MB). 상세는 위 "메모리 (NFR 힙 ≤ 256MB)".
 
 ## 알려진 한계
 
