@@ -55,8 +55,8 @@ object FaultEvaluator {
         val hits = timeline.frames.filter { it.sampleIndex in first..last }.flatMap { frame ->
             contributing.mapNotNull { rule ->
                 val angle = frame.angles[rule.id] ?: return@mapNotNull null
-                val check = violation(angle, overrides[rule.id] ?: rule.threshold) ?: return@mapNotNull null
-                Hit(rule.id, angle, check.second).takeIf { rule.faults[check.first]?.id == segment.faultId }
+                val threshold = overrides[rule.id] ?: rule.threshold
+                Hit(rule.id, angle, threshold.excessDeg(angle)).takeIf { rule.faultAt(angle, threshold)?.id == segment.faultId }
             }
         }
         if (hits.isEmpty()) return null
@@ -84,36 +84,19 @@ object FaultEvaluator {
         var current: Run? = null
         var currentViolation: Violation? = null
         for ((i, angle) in series.withIndex()) {
-            val check = angle?.let { violation(it, threshold) }
-            val fault = check?.let { rule.faults[it.first] }
-            if (fault != null && current != null && currentViolation == check.first) {
+            val violation = angle?.let(threshold::violation)
+            val fault = violation?.let(rule.faults::get)
+            if (fault != null && current != null && currentViolation == violation) {
                 current.last = i
-                current.hits += Hit(rule.id, angle, check.second)
+                current.hits += Hit(rule.id, angle, threshold.excessDeg(angle))
                 continue
             }
             current?.takeIf { it.hits.size >= MIN_SAMPLES }?.let(runs::add)
-            current = fault?.let { Run(it, i, i, mutableListOf(Hit(rule.id, angle, check.second))) }
-            currentViolation = check?.first.takeIf { fault != null }
+            current = fault?.let { Run(it, i, i, mutableListOf(Hit(rule.id, angle, threshold.excessDeg(angle)))) }
+            currentViolation = violation.takeIf { fault != null }
         }
         current?.takeIf { it.hits.size >= MIN_SAMPLES }?.let(runs::add)
         return runs
-    }
-
-    /** Returns the violation and the degrees beyond its bound, or null when the signed angle θ is within [threshold]. */
-    private fun violation(angle: Float, threshold: AngleThreshold): Pair<Violation, Float>? = when (threshold) {
-        is AngleThreshold.Deviation -> {
-            val dev = angle - 180f
-            when {
-                dev > threshold.maxExtensionDeg -> Violation.EXTENSION to dev - threshold.maxExtensionDeg
-                dev < -threshold.maxFlexionDeg -> Violation.FLEXION to -threshold.maxFlexionDeg - dev
-                else -> null
-            }
-        }
-        is AngleThreshold.Range -> when {
-            angle < threshold.min -> Violation.BELOW to threshold.min - angle
-            angle > threshold.max -> Violation.ABOVE to angle - threshold.max
-            else -> null
-        }
     }
 
     private fun merge(sorted: List<Run>): List<Run> {

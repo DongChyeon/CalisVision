@@ -50,7 +50,7 @@ fun AnglePanel(
 private fun AngleCell(rule: PoseRule, angle: Float?, threshold: AngleThreshold, broken: Boolean, modifier: Modifier) {
     val colors = CalisTheme.colors
     val app = CalisTheme.appColors
-    val violation = angle?.let { violationOf(it, threshold) }
+    val violation = angle?.let(threshold::violation)
     val accent: Color = when {
         broken -> app.fault
         violation != null -> app.warning

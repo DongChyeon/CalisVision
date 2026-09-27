@@ -112,7 +112,7 @@ class ResultViewModel(
 
     private fun brokenRules(sampleIndex: Int, thresholds: Map<RuleId, AngleThreshold>): Set<RuleId> {
         val angles = anglesBySample[sampleIndex].orEmpty()
-        return rules.filter { rule -> rule.isBrokenBy(angles[rule.id], thresholds.getValue(rule.id)) }.mapTo(mutableSetOf()) { it.id }
+        return rules.filter { rule -> angles[rule.id]?.let { rule.faultAt(it, thresholds.getValue(rule.id)) } != null }.mapTo(mutableSetOf()) { it.id }
     }
 
     private fun stateOf(position: Position, evaluation: Evaluation) = ResultUiState(

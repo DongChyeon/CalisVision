@@ -24,6 +24,9 @@ data class PoseRule(
     init {
         require(joints.size == 3)
     }
+
+    /** The fault the signed angle [theta] makes under [threshold]; null when within it or the violation maps to no fault. */
+    fun faultAt(theta: Float, threshold: AngleThreshold = this.threshold): PoseFault? = threshold.violation(theta)?.let(faults::get)
 }
 
 data class ShootingGuide(
