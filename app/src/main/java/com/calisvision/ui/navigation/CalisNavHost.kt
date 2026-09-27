@@ -17,6 +17,8 @@ import com.calisvision.ui.guide.ShootingGuideScreen
 import com.calisvision.ui.home.HomeScreen
 import com.calisvision.ui.result.ResultScreen
 import com.calisvision.ui.result.ResultViewModel
+import com.calisvision.ui.settings.SettingsScreen
+import com.calisvision.ui.settings.SettingsViewModel
 
 /** String routes; arguments are URL-encoded where they can contain reserved characters. */
 object Routes {
@@ -24,6 +26,7 @@ object Routes {
     const val GUIDE = "guide/{exerciseId}"
     const val ANALYSIS = "analysis/{exerciseId}?uri={uri}"
     const val RESULT = "result/{sessionId}"
+    const val SETTINGS = "settings"
 
     fun guide(exerciseId: String) = "guide/$exerciseId"
 
@@ -39,7 +42,10 @@ fun CalisNavHost(container: AppContainer) {
 
     NavHost(navController = nav, startDestination = Routes.HOME) {
         composable(Routes.HOME) {
-            HomeScreen(onExerciseSelected = { nav.navigate(Routes.guide(it)) })
+            HomeScreen(
+                onExerciseSelected = { nav.navigate(Routes.guide(it)) },
+                onOpenSettings = { nav.navigate(Routes.SETTINGS) },
+            )
         }
         composable(Routes.GUIDE, arguments = listOf(navArgument("exerciseId") { type = NavType.StringType })) { entry ->
             val exercise = ExerciseCatalog.byId(entry.arguments?.getString("exerciseId").orEmpty())
@@ -83,10 +89,14 @@ fun CalisNavHost(container: AppContainer) {
                 return@composable
             }
             ResultScreen(
-                viewModel = viewModel { ResultViewModel(session) },
+                viewModel = viewModel { ResultViewModel(session, container.thresholds.thresholds) },
                 onBack = { nav.popBackStack() },
                 onAnotherVideo = { nav.navigate(Routes.guide(session.exercise.id)) { popUpTo(Routes.HOME) } },
+                onOpenSettings = { nav.navigate(Routes.SETTINGS) },
             )
+        }
+        composable(Routes.SETTINGS) {
+            SettingsScreen(viewModel = viewModel { SettingsViewModel(container.thresholds) }, onBack = { nav.popBackStack() })
         }
     }
 }

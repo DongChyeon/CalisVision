@@ -15,5 +15,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val sessions = AnalysisSessionStore()
 
+    override val thresholds: ThresholdRepository by lazy { DataStoreThresholdRepository(appContext) }
+
     override val pickVideo: ActivityResultContract<PickVisualMediaRequest, Uri?> = ActivityResultContracts.PickVisualMedia()
 }

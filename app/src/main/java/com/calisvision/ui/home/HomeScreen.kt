@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +33,7 @@ private val SUPPORTED_EXERCISES = setOf(HandstandKnowledge.exercise.id)
 @Composable
 fun HomeScreen(
     onExerciseSelected: (exerciseId: String) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val supported = ExerciseCatalog.all.filter { it.id in SUPPORTED_EXERCISES }
     Surface(color = CalisTheme.colors.backgroundNormalNormal, modifier = Modifier.fillMaxSize()) {
@@ -71,6 +73,14 @@ fun HomeScreen(
                 shape = RoundedCornerShape(CalisTheme.radius.component),
             ) {
                 Text(stringResource(R.string.home_start), style = CalisTheme.typography.body1Bold)
+            }
+            OutlinedButton(
+                onClick = onOpenSettings,
+                shape = RoundedCornerShape(CalisTheme.radius.component),
+                border = BorderStroke(CalisTheme.spacing.divider, CalisTheme.colors.lineNormalNormal),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.settings_open), style = CalisTheme.typography.body1Medium, color = CalisTheme.colors.labelNormal)
             }
         }
     }

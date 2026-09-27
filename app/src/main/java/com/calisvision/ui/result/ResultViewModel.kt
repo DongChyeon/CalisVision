@@ -1,15 +1,21 @@
 package com.calisvision.ui.result
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.calisvision.data.AnalysisSession
+import com.calisvision.domain.analysis.FaultEvaluator
 import com.calisvision.domain.analysis.FaultSegment
 import com.calisvision.domain.model.FramePose
 import com.calisvision.domain.model.Joint
 import com.calisvision.domain.rules.AngleThreshold
 import com.calisvision.domain.rules.RuleId
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import java.io.File
 
@@ -31,57 +37,77 @@ data class ResultUiState(
 /**
  * The scrubber position is a sampleIndex: frames hold one entry per 0.1 s sample in order (PoseLandmarkerEngine fills
  * index i with sample i), so one step is exactly one sample and image, skeleton and angles share it (AC-7).
+ *
+ * Faults are re-derived from the stored angle timeline whenever [thresholds] emits; the video is never re-analyzed
+ * (AC-9).
  */
-class ResultViewModel(val session: AnalysisSession) : ViewModel() {
+class ResultViewModel(
+    val session: AnalysisSession,
+    thresholds: Flow<Map<RuleId, AngleThreshold>>,
+) : ViewModel() {
 
     val result get() = session.result
     val sampleCount: Int get() = result.frames.size
 
+    private val rules = session.exercise.rules
     private val anglesBySample = result.timeline.frames.associate { it.sampleIndex to it.angles }
-    private val thresholds: Map<RuleId, AngleThreshold> = session.exercise.rules.associate { it.id to it.threshold }
 
-    private val _state = MutableStateFlow(stateAt(result.holdSegment?.first ?: 0, selectedFault = null))
-    val state: StateFlow<ResultUiState> = _state.asStateFlow()
+    private data class Position(val sampleIndex: Int, val selectedFault: FaultSegment?)
+    private data class Evaluation(val thresholds: Map<RuleId, AngleThreshold>, val faults: List<FaultSegment>)
+
+    private val position = MutableStateFlow(Position(result.holdSegment?.first ?: 0, null))
+
+    private val evaluation: StateFlow<Evaluation> = thresholds
+        .map(::evaluate)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, evaluate(emptyMap()))
+
+    val state: StateFlow<ResultUiState> = combine(position, evaluation, ::stateOf)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, stateOf(position.value, evaluation.value))
 
     fun seekTo(sampleIndex: Int) {
         if (sampleCount == 0) return
-        _state.update { stateAt(sampleIndex.coerceIn(0, sampleCount - 1), it.selectedFault) }
+        position.update { it.copy(sampleIndex = sampleIndex.coerceIn(0, sampleCount - 1)) }
     }
 
-    fun step(delta: Int) = seekTo(state.value.sampleIndex + delta)
+    fun step(delta: Int) = seekTo(position.value.sampleIndex + delta)
 
     /** Opens the fault sheet and moves to the fault's first sample. */
     fun selectFault(fault: FaultSegment) {
-        _state.update { stateAt(fault.range.first.coerceIn(0, (sampleCount - 1).coerceAtLeast(0)), fault) }
+        position.value = Position(fault.range.first.coerceIn(0, (sampleCount - 1).coerceAtLeast(0)), fault)
     }
 
     fun dismissFault() {
-        _state.update { it.copy(selectedFault = null) }
+        position.update { it.copy(selectedFault = null) }
     }
 
     fun framePath(sampleIndex: Int): File = File(result.frameDir, "$sampleIndex.jpg")
 
     fun overlay(sampleIndex: Int): FrameOverlay {
-        val broken = brokenRules(sampleIndex)
-        val faultJoints = session.exercise.rules.filter { it.id in broken }.mapTo(mutableSetOf()) { it.joints[1] }
+        val broken = brokenRules(sampleIndex, evaluation.value.thresholds)
+        val faultJoints = rules.filter { it.id in broken }.mapTo(mutableSetOf()) { it.joints[1] }
         return FrameOverlay(result.frames.getOrNull(sampleIndex), faultJoints)
     }
 
-    private fun brokenRules(sampleIndex: Int): Set<RuleId> {
-        val angles = anglesBySample[sampleIndex].orEmpty()
-        return session.exercise.rules
-            .filter { rule -> rule.isBrokenBy(angles[rule.id], thresholds.getValue(rule.id)) }
-            .mapTo(mutableSetOf()) { it.id }
+    /** Stored overrides win; rules without one keep the knowledge-base default. */
+    private fun evaluate(overrides: Map<RuleId, AngleThreshold>): Evaluation {
+        val effective = rules.associate { it.id to (overrides[it.id] ?: it.threshold) }
+        return Evaluation(effective, FaultEvaluator.evaluate(result.timeline, session.exercise, effective))
     }
 
-    private fun stateAt(sampleIndex: Int, selectedFault: FaultSegment?) = ResultUiState(
-        sampleIndex = sampleIndex,
-        displayTimeMs = result.frames.getOrNull(sampleIndex)?.displayTimeMs ?: 0L,
-        angles = anglesBySample[sampleIndex].orEmpty(),
-        thresholds = thresholds,
-        brokenRules = brokenRules(sampleIndex),
-        faults = result.faults,
-        holdFaults = result.faults.filter { it.isInHold(result.holdSegment) },
-        selectedFault = selectedFault,
+    private fun brokenRules(sampleIndex: Int, thresholds: Map<RuleId, AngleThreshold>): Set<RuleId> {
+        val angles = anglesBySample[sampleIndex].orEmpty()
+        return rules.filter { rule -> rule.isBrokenBy(angles[rule.id], thresholds.getValue(rule.id)) }.mapTo(mutableSetOf()) { it.id }
+    }
+
+    private fun stateOf(position: Position, evaluation: Evaluation) = ResultUiState(
+        sampleIndex = position.sampleIndex,
+        displayTimeMs = result.frames.getOrNull(position.sampleIndex)?.displayTimeMs ?: 0L,
+        angles = anglesBySample[position.sampleIndex].orEmpty(),
+        thresholds = evaluation.thresholds,
+        brokenRules = brokenRules(position.sampleIndex, evaluation.thresholds),
+        faults = evaluation.faults,
+        holdFaults = evaluation.faults.filter { it.isInHold(result.holdSegment) },
+        // A threshold change can remove or reshape the open fault; close the sheet then.
+        selectedFault = position.selectedFault?.takeIf { it in evaluation.faults },
     )
 }

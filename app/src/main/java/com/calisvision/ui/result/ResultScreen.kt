@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -41,13 +42,20 @@ fun ResultScreen(
     viewModel: ResultViewModel,
     onBack: () -> Unit,
     onAnotherVideo: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val result = viewModel.result
     val frameMaxHeight = with(LocalDensity.current) { (LocalWindowInfo.current.containerSize.height * FRAME_MAX_HEIGHT_FRACTION).toDp() }
 
     Scaffold(
-        topBar = { CalisTopBar(stringResource(R.string.result_title), onBack = onBack) },
+        topBar = {
+            CalisTopBar(stringResource(R.string.result_title), onBack = onBack) {
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_open))
+                }
+            }
+        },
         containerColor = CalisTheme.colors.backgroundNormalNormal,
     ) { padding ->
         Column(

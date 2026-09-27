@@ -7,6 +7,8 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContract
 import com.calisvision.data.AnalysisSessionStore
 import com.calisvision.data.AppContainer
+import com.calisvision.data.InMemoryThresholdRepository
+import com.calisvision.data.ThresholdRepository
 import com.calisvision.domain.analysis.AngleTimeline
 import com.calisvision.domain.model.AnalysisResult
 import com.calisvision.domain.rules.Exercise
@@ -19,6 +21,7 @@ class TestAppContainer(
     override val analyzer: VideoAnalyzer = FakeAnalyzer(),
     override val pickVideo: FakePickVideo = FakePickVideo(),
     override val sessions: AnalysisSessionStore = AnalysisSessionStore(),
+    override val thresholds: ThresholdRepository = InMemoryThresholdRepository(),
 ) : AppContainer
 
 /** Returns [result] synchronously instead of opening the system picker; [launches] counts picker opens. */

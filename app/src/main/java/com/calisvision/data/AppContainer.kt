@@ -10,6 +10,8 @@ interface AppContainer {
 
     val sessions: AnalysisSessionStore
 
+    val thresholds: ThresholdRepository
+
     /** Gallery picker; replaceable so instrumented tests can return a video without the system UI. */
     val pickVideo: ActivityResultContract<PickVisualMediaRequest, Uri?>
 }
