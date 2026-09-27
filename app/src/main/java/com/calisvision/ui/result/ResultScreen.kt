@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,6 +55,7 @@ fun ResultScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
+                .testTag("result_scroll")
                 .padding(horizontal = CalisTheme.spacing.s20)
                 .padding(bottom = CalisTheme.spacing.s24),
             verticalArrangement = Arrangement.spacedBy(CalisTheme.spacing.s12),
@@ -84,12 +86,20 @@ fun ResultScreen(
                     hold = result.holdSegment,
                     bands = state.faults.map { TimelineBand(it, it.isInHold(result.holdSegment)) },
                     onSeek = viewModel::seekTo,
-                    onBandTap = {},
+                    onBandTap = viewModel::selectFault,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (result.holdSegment == null) {
                     Text(stringResource(R.string.result_no_hold), style = CalisTheme.typography.label1Regular, color = CalisTheme.colors.statusCautionary)
                 }
+                AnglePanel(
+                    rules = viewModel.session.exercise.rules,
+                    angles = state.angles,
+                    thresholds = state.thresholds,
+                    brokenRules = state.brokenRules,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                FaultList(state.holdFaults, onSelect = viewModel::selectFault, modifier = Modifier.fillMaxWidth())
             }
             OutlinedButton(
                 onClick = onAnotherVideo,
@@ -99,8 +109,10 @@ fun ResultScreen(
             ) {
                 Text(stringResource(R.string.result_another_video), style = CalisTheme.typography.body1Medium, color = CalisTheme.colors.labelNormal)
             }
+            Text(stringResource(R.string.result_memory_notice), style = CalisTheme.typography.caption1Regular, color = CalisTheme.colors.labelAssistive)
         }
     }
+    state.selectedFault?.let { FaultSheet(it, viewModel.session.exercise.rules, onDismiss = viewModel::dismissFault) }
 }
 
 @Composable

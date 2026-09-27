@@ -56,4 +56,25 @@
     <string name="result_no_orientation">몸의 방향을 판정하지 못해 관절과 각도를 표시할 수 없습니다.</string>
     <string name="result_no_hold">홀드 구간을 찾지 못했습니다. 5초 이상 자세를 유지한 영상인지 확인해 주세요.</string>
     <string name="result_another_video">다른 영상 분석</string>
+    <string name="result_memory_notice">분석 결과는 저장되지 않으며 앱을 닫으면 사라집니다.</string>
+
+    <!-- 각도 패널 -->
+    <string name="angle_degrees">%1$.1f°</string>
+    <string name="angle_unmeasurable">측정 불가</string>
+    <string name="angle_straight">일직선</string>
+    <string name="angle_extension">과신전</string>
+    <string name="angle_flexion">굴곡</string>
+    <string name="angle_deviation_toward">%1$+.1f° · %2$s 쪽</string>
+    <string name="angle_below">굽힘</string>
+    <string name="angle_hyperextension">과신전</string>
+    <string name="angle_in_range">범위 안 (%1$.0f–%2$.0f°)</string>
+
+    <!-- 결함 -->
+    <string name="fault_list_title">홀드 중 결함</string>
+    <string name="fault_list_empty">홀드 구간에서 발견된 결함이 없습니다.</string>
+    <string name="fault_time_range">%1$.1f–%2$.1f초</string>
+    <string name="fault_hint_title">교정 힌트</string>
+    <string name="fault_angles_title">측정 각도</string>
+    <string name="fault_angle_value">%1$.1f° (편차 %2$+.1f°)</string>
+    <string name="fault_angles_note">구간에서 180°에서 가장 크게 벗어난 값입니다.</string>
 </resources>
