@@ -31,4 +31,5 @@ Accepted
 
 ## Follow-ups
 - P1.5 게이트(검출률 ≥90%, 평균 visibility ≥0.5, 방향 선택 정확, front 부호 정확도 100%) 실패 시 heavy 모델·GPU delegate 또는 RTMPose/TFLite로 재평가한다.
+- P1.5 실측(2026-09-27, SM-F766N, `docs/VERIFICATION.md`): 검출률 100%(원본 131/131) / 99.2%(rot180 사본), 평균 visibility 0.978 / 0.888, frontSign +1 둘 다 정답. 방향은 두 영상 모두 0° 선택(score 원본 0.743 vs 180° 0.083, 사본 0.592 vs 0.000) — `setRotationDegrees(180)`은 검출을 거의 무력화(홀드 94프레임 중 1), 비트맵 Matrix 회전 시 score 0.709 / 0.537. 방향 기준은 ADR-0006으로 재정의되어 게이트 PASS, 본 ADR 확정. 성능은 13s 영상 41–47s(디코드 171–190 ms/프레임, 추론 104–121 ms/프레임)로 NFR-2 초과 추세.
 - P4에서 full vs heavy × CPU vs GPU 비교표를 작성한다.
