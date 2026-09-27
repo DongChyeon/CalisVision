@@ -276,7 +276,7 @@ ReferenceHoldGateResult(passed=true, reasons=[], holdSamples=116, nullSamples=0,
 | AC-12 dummy Exercise 확장 | PASS | `ExerciseCatalogTest` |
 | AC-13 PRD 5개 섹션 | PASS | §6-1 `grep -c` = 5 |
 | AC-14 REQUIREMENTS AC 참조 | PASS | §6-1 루프 출력 없음 |
-| AC-15 ADR ≥ 5, 9개 섹션 | PASS | ADR 8개, `grep -L` 출력 없음 |
+| AC-15 ADR ≥ 5, 9개 섹션 | PASS | ADR 9개(ADR-0009 포함), `grep -L` 출력 없음 |
 | AC-16 민감 파일 무시 | PASS | `git check-ignore` 10행, porcelain grep exit=1 |
 
 요약(ADR-0008 반영, AC 17행): PASS 16(AC-4는 재정의 기준), FAIL 0, 수동 0(AC-5 비행기 모드·AC-7 육안은 수행 완료로 PASS에 포함), 미검증 1(AC-9b). NFR: 성능(NFR-2, 30 s ≤ 60 s) PASS, 힙(NFR-3, Java heap 34.8 MB ≤ 256 MB) PASS — 아래 "NFR".
