@@ -3,6 +3,7 @@ package com.calisvision.ui.result
 import android.net.Uri
 import com.calisvision.data.AnalysisSessionStore
 import com.calisvision.data.InMemoryThresholdRepository
+import com.calisvision.domain.analysis.AngleTimeline
 import com.calisvision.domain.knowledge.HandstandKnowledge
 import com.calisvision.domain.rules.AngleThreshold
 import com.calisvision.domain.rules.Exercise
@@ -108,6 +109,36 @@ class ResultViewModelTest {
         assertFalse(outside in state.holdFaults)
         val merged = state.holdFaults.single { it.range == SyntheticResult.MERGED_PIKE }
         assertEquals(setOf(HandstandKnowledge.ALIGNMENT, HandstandKnowledge.HIP), merged.angles.keys)
+    }
+
+    /** A fault that starts before the hold is listed with its range and peak angles clipped to the hold; its band keeps the full range. */
+    @Test
+    fun listedFaultsAreClippedToTheHold() {
+        val base = SyntheticResult.session()
+        val hold = 22..43
+        // 바나나 등 peaks at 200° only before the hold (20..21); inside it stays at 195°.
+        val timeline = AngleTimeline(base.result.timeline.frames.map { f ->
+            if (f.sampleIndex in 20..21) f.copy(angles = f.angles + (HandstandKnowledge.ALIGNMENT to 200f)) else f
+        })
+        val session = base.copy(result = base.result.copy(holdSegment = hold, timeline = timeline))
+        val vm = ResultViewModel(session, repository.thresholds)
+        val state = vm.state.value
+
+        val banana = state.holdFaults.single { it.faultId == HandstandKnowledge.BANANA.id }
+        assertEquals(22..29, banana.range)
+        assertEquals(mapOf(HandstandKnowledge.ALIGNMENT to 195f), banana.angles)
+        assertEquals(15f, banana.peakDeviation, 0.01f)
+        val pike = state.holdFaults.single { it.faultId == HandstandKnowledge.PIKE.id }
+        assertEquals(40..43, pike.range)
+
+        val band = state.bands.single { it.fault.faultId == HandstandKnowledge.BANANA.id }
+        assertEquals(SyntheticResult.BANANA, band.fault.range)
+        assertEquals(banana, band.listed)
+        assertEquals(null, state.bands.single { it.fault.range == SyntheticResult.OUTSIDE_PIKE }.listed)
+
+        vm.selectFault(banana)
+        assertEquals(banana, vm.state.value.selectedFault)
+        assertEquals(22, vm.state.value.sampleIndex)
     }
 
     @Test

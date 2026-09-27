@@ -22,7 +22,10 @@ import java.io.File
 /** Image, skeleton and angles of one sample; [faultJoints] are vertices of rules this sample breaks. */
 data class FrameOverlay(val pose: FramePose?, val faultJoints: Set<Joint>)
 
-/** [holdFaults] are the listed ones (inside the hold segment); [brokenRules] are rules the current sample breaks. */
+/**
+ * [holdFaults] are the listed ones (inside the hold segment), clipped to the hold; [bands] draw every fault in full.
+ * [brokenRules] are rules the current sample breaks.
+ */
 data class ResultUiState(
     val sampleIndex: Int,
     val displayTimeMs: Long,
@@ -31,6 +34,7 @@ data class ResultUiState(
     val brokenRules: Set<RuleId>,
     val faults: List<FaultSegment>,
     val holdFaults: List<FaultSegment>,
+    val bands: List<TimelineBand>,
     val selectedFault: FaultSegment? = null,
 )
 
@@ -53,7 +57,13 @@ class ResultViewModel(
     private val anglesBySample = result.timeline.frames.associate { it.sampleIndex to it.angles }
 
     private data class Position(val sampleIndex: Int, val selectedFault: FaultSegment?)
-    private data class Evaluation(val thresholds: Map<RuleId, AngleThreshold>, val faults: List<FaultSegment>)
+    private data class Evaluation(
+        val thresholds: Map<RuleId, AngleThreshold>,
+        val faults: List<FaultSegment>,
+        val bands: List<TimelineBand>,
+    ) {
+        val holdFaults: List<FaultSegment> get() = bands.mapNotNull { it.listed }
+    }
 
     private val position = MutableStateFlow(Position(result.holdSegment?.first ?: 0, null))
 
@@ -91,7 +101,13 @@ class ResultViewModel(
     /** Stored overrides win; rules without one keep the knowledge-base default. */
     private fun evaluate(overrides: Map<RuleId, AngleThreshold>): Evaluation {
         val effective = rules.associate { it.id to (overrides[it.id] ?: it.threshold) }
-        return Evaluation(effective, FaultEvaluator.evaluate(result.timeline, session.exercise, effective))
+        val faults = FaultEvaluator.evaluate(result.timeline, session.exercise, effective)
+        val hold = result.holdSegment
+        val bands = faults.map { fault ->
+            val listed = hold?.takeIf { fault.isInHold(it) }?.let { FaultEvaluator.clip(fault, it, result.timeline, rules, effective) }
+            TimelineBand(fault, listed)
+        }
+        return Evaluation(effective, faults, bands)
     }
 
     private fun brokenRules(sampleIndex: Int, thresholds: Map<RuleId, AngleThreshold>): Set<RuleId> {
@@ -106,8 +122,9 @@ class ResultViewModel(
         thresholds = evaluation.thresholds,
         brokenRules = brokenRules(position.sampleIndex, evaluation.thresholds),
         faults = evaluation.faults,
-        holdFaults = evaluation.faults.filter { it.isInHold(result.holdSegment) },
+        holdFaults = evaluation.holdFaults,
+        bands = evaluation.bands,
         // A threshold change can remove or reshape the open fault; close the sheet then.
-        selectedFault = position.selectedFault?.takeIf { it in evaluation.faults },
+        selectedFault = position.selectedFault?.takeIf { it in evaluation.holdFaults },
     )
 }

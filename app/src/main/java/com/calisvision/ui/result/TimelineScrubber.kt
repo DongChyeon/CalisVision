@@ -32,8 +32,11 @@ import com.calisvision.video.FrameSource
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
-/** A fault band; [inHold] bands are solid and tappable, the others dimmed (user decision 2026-09-27). */
-data class TimelineBand(val fault: FaultSegment, val inHold: Boolean)
+/**
+ * A fault band drawn over its full [fault] range, dimmed; [listed] is its hold-clipped, listed version (null when the
+ * fault is not inside the hold), drawn solid and tappable over its range (user decision 2026-09-27).
+ */
+data class TimelineBand(val fault: FaultSegment, val listed: FaultSegment?)
 
 /**
  * The track is split into [sampleCount] equal cells, one per sample: a tap or drag at x selects cell
@@ -88,7 +91,7 @@ fun TimelineScrubber(
                         val index = cell(offset.x)
                         seek(index)
                         val lane = currentLanes.getOrNull(floor((offset.y - (laneTop - laneGap / 2).toPx()) / (laneHeight + laneGap).toPx()).toInt())
-                        currentBands.firstOrNull { it.inHold && it.fault.faultId == lane && index in it.fault.range }?.let { bandTap(it.fault) }
+                        currentBands.firstNotNullOfOrNull { band -> band.listed?.takeIf { it.faultId == lane && index in it.range } }?.let(bandTap)
                     }
                 }
                 .pointerInput(sampleCount) {
@@ -110,11 +113,13 @@ fun TimelineScrubber(
             }
             bands.forEach { band ->
                 val lane = lanes.indexOf(band.fault.faultId)
-                val (o, s) = span(band.fault.range, (laneTop + (laneHeight + laneGap) * lane).toPx(), laneHeight.toPx())
-                drawRoundRect(
-                    appColors.fault.copy(alpha = if (band.inHold) MontageOpacity.O100 else MontageOpacity.O28),
-                    o, s, CornerRadius(radius.small.toPx()),
-                )
+                val top = (laneTop + (laneHeight + laneGap) * lane).toPx()
+                val (o, s) = span(band.fault.range, top, laneHeight.toPx())
+                drawRoundRect(appColors.fault.copy(alpha = MontageOpacity.O28), o, s, CornerRadius(radius.small.toPx()))
+                band.listed?.let {
+                    val (lo, ls) = span(it.range, top, laneHeight.toPx())
+                    drawRoundRect(appColors.fault, lo, ls, CornerRadius(radius.small.toPx()))
+                }
             }
             val x = (sampleIndex + 0.5f) * cellWidth
             drawLine(colors.labelNormal, Offset(x, 0f), Offset(x, size.height), strokeWidth = spacing.s2.toPx())

@@ -92,7 +92,7 @@ fun ResultScreen(
                     sampleCount = viewModel.sampleCount,
                     sampleIndex = state.sampleIndex,
                     hold = result.holdSegment,
-                    bands = state.faults.map { TimelineBand(it, it.isInHold(result.holdSegment)) },
+                    bands = state.bands,
                     onSeek = viewModel::seekTo,
                     onBandTap = viewModel::selectFault,
                     modifier = Modifier.fillMaxWidth(),

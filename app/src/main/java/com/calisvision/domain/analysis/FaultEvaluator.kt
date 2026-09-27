@@ -37,13 +37,41 @@ object FaultEvaluator {
             .sortedWith(compareBy({ it.range.first }, { it.faultId }))
     }
 
+    /**
+     * [segment] restricted to the samples in [window] (sampleIndex): range, angles, peak and excess are re-derived from
+     * the samples there that still break a contributing rule into the same fault. Null when none do.
+     */
+    fun clip(
+        segment: FaultSegment,
+        window: IntRange,
+        timeline: AngleTimeline,
+        rules: List<PoseRule>,
+        overrides: Map<RuleId, AngleThreshold> = emptyMap(),
+    ): FaultSegment? {
+        val first = maxOf(segment.range.first, window.first)
+        val last = minOf(segment.range.last, window.last)
+        if (first > last) return null
+        val contributing = rules.filter { it.id in segment.angles }
+        val hits = timeline.frames.filter { it.sampleIndex in first..last }.flatMap { frame ->
+            contributing.mapNotNull { rule ->
+                val angle = frame.angles[rule.id] ?: return@mapNotNull null
+                val check = violation(angle, overrides[rule.id] ?: rule.threshold) ?: return@mapNotNull null
+                Hit(rule.id, angle, check.second).takeIf { rule.faults[check.first]?.id == segment.faultId }
+            }
+        }
+        if (hits.isEmpty()) return null
+        return FaultSegment(segment.fault, first..last, hits.peakAngles(), hits.maxBy { abs(it.deviation) }.deviation, hits.maxOf { it.excess })
+    }
+
+    private fun List<Hit>.peakAngles() = groupBy { it.ruleId }.mapValues { (_, h) -> h.maxBy { abs(it.deviation) }.angle }
+
     private class Hit(val ruleId: RuleId, val angle: Float, val excess: Float) {
         val deviation: Float get() = angle - 180f
     }
 
     private class Run(val fault: PoseFault, var first: Int, var last: Int, val hits: MutableList<Hit>) {
         fun toSegment(timeline: AngleTimeline): FaultSegment {
-            val angles = hits.groupBy { it.ruleId }.mapValues { (_, h) -> h.maxBy { abs(it.deviation) }.angle }
+            val angles = hits.peakAngles()
             val peak = hits.maxBy { abs(it.deviation) }.deviation
             val excess = hits.maxOf { it.excess }
             return FaultSegment(fault, timeline.frames[first].sampleIndex..timeline.frames[last].sampleIndex, angles, peak, excess)
