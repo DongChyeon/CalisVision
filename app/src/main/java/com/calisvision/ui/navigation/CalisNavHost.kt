@@ -1,7 +1,6 @@
 package com.calisvision.ui.navigation
 
 import android.net.Uri
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -16,6 +15,8 @@ import com.calisvision.ui.analysis.AnalysisScreen
 import com.calisvision.ui.analysis.AnalysisViewModel
 import com.calisvision.ui.guide.ShootingGuideScreen
 import com.calisvision.ui.home.HomeScreen
+import com.calisvision.ui.result.ResultScreen
+import com.calisvision.ui.result.ResultViewModel
 
 /** String routes; arguments are URL-encoded where they can contain reserved characters. */
 object Routes {
@@ -81,8 +82,11 @@ fun CalisNavHost(container: AppContainer) {
                 LaunchedEffect(Unit) { goHome() }
                 return@composable
             }
-            // Placeholder until the result screen lands (P3-3).
-            Text(session.id)
+            ResultScreen(
+                viewModel = viewModel { ResultViewModel(session) },
+                onBack = { nav.popBackStack() },
+                onAnotherVideo = { nav.navigate(Routes.guide(session.exercise.id)) { popUpTo(Routes.HOME) } },
+            )
         }
     }
 }

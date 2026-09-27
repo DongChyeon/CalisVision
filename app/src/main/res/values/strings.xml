@@ -42,4 +42,18 @@
     <string name="analysis_failed_title">분석하지 못했습니다</string>
     <string name="analysis_failed_body">영상을 읽거나 자세를 찾지 못했습니다. 촬영 가이드대로 찍은 영상인지 확인해 주세요.</string>
     <string name="analysis_failed_home">홈으로</string>
+
+    <!-- 결과 -->
+    <string name="result_title">분석 결과</string>
+    <string name="result_time_sample">%1$.1f초 · #%2$d</string>
+    <string name="result_seconds">%1$.1f초</string>
+    <string name="result_hold_range">홀드 %1$.1f–%2$.1f초</string>
+    <string name="result_prev_sample">이전 샘플</string>
+    <string name="result_next_sample">다음 샘플</string>
+    <string name="result_timeline_description">타임라인</string>
+    <string name="result_frame_description">샘플 %1$d 프레임과 관절</string>
+    <string name="result_no_frames">분석된 프레임이 없습니다.</string>
+    <string name="result_no_orientation">몸의 방향을 판정하지 못해 관절과 각도를 표시할 수 없습니다.</string>
+    <string name="result_no_hold">홀드 구간을 찾지 못했습니다. 5초 이상 자세를 유지한 영상인지 확인해 주세요.</string>
+    <string name="result_another_video">다른 영상 분석</string>
 </resources>
