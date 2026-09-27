@@ -101,7 +101,7 @@ object HandstandKnowledge {
         shootingGuide = ShootingGuide(
             view = "측면",
             faultsCovered = listOf(BANANA.name, PIKE.name, ANTERIOR_TILT.name, CLOSED_SHOULDER.name, BENT_ELBOW.name),
-            instruction = "몸의 옆면이 보이도록 카메라를 두세요. 삼각대를 엉덩이 높이에 놓고 2–3m 떨어져, 손끝부터 발끝까지 전신이 프레임 안에 들어오게 촬영하세요.",
+            instruction = "몸의 옆면이 보이도록 카메라를 두세요. 삼각대를 엉덩이 높이에 놓고 2–3m 떨어져, 손끝부터 발끝까지 전신이 프레임 안에 들어오고 손목·발목이 가려지지 않게 촬영하세요.",
         ),
     )
 

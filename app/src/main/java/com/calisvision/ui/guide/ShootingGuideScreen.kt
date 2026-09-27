@@ -37,6 +37,7 @@ private val TIPS = listOf(
     R.string.guide_tip_height_title to R.string.guide_tip_height_body,
     R.string.guide_tip_distance_title to R.string.guide_tip_distance_body,
     R.string.guide_tip_hold_title to R.string.guide_tip_hold_body,
+    R.string.guide_tip_clear_title to R.string.guide_tip_clear_body,
 )
 
 /** The only entry point to the gallery picker, so the guide is always seen first (AC-11). */

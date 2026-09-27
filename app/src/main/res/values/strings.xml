@@ -24,8 +24,10 @@
     <string name="guide_tip_height_body">카메라를 수평으로 고정하세요</string>
     <string name="guide_tip_distance_title">2–3m · 전신</string>
     <string name="guide_tip_distance_body">손끝부터 발끝까지 프레임 안에 들어오게</string>
-    <string name="guide_tip_hold_title">5초 이상 홀드</string>
-    <string name="guide_tip_hold_body">10–20초 영상이면 충분합니다</string>
+    <string name="guide_tip_hold_title">7초 이상 홀드</string>
+    <string name="guide_tip_hold_body">홀드가 끝나면 바로 촬영을 멈추세요</string>
+    <string name="guide_tip_clear_title">손·발이 가려지지 않게</string>
+    <string name="guide_tip_clear_body">쿠션이나 가구가 손목과 발목을 가리면 정렬을 잴 수 없습니다</string>
     <string name="guide_faults_covered">이 촬영으로 확인하는 자세</string>
     <string name="guide_pick_video">갤러리에서 영상 고르기</string>
 
