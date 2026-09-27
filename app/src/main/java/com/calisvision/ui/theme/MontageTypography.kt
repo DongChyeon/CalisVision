@@ -8,8 +8,7 @@
  * Copyright (c) 2025 Wanted Lab, Inc. — MIT License (full text in MontageTokens.kt and
  * docs/THIRD_PARTY_NOTICES.md).
  *
- * Font: Pretendard Std 1.3.9 (SIL OFL 1.1), bundled unmodified under res/font.
- * Pretendard Std has no Hangul; Korean glyphs fall back to the system font.
+ * Font: Pretendard 1.3.9 (SIL OFL 1.1, Hangul included), bundled unmodified under res/font.
  */
 package com.calisvision.ui.theme
 
@@ -25,10 +24,10 @@ import androidx.compose.ui.unit.sp
 import com.calisvision.R
 
 val Pretendard = FontFamily(
-    Font(R.font.pretendard_std_regular, FontWeight.W400),
-    Font(R.font.pretendard_std_medium, FontWeight.W500),
-    Font(R.font.pretendard_std_semibold, FontWeight.W600),
-    Font(R.font.pretendard_std_bold, FontWeight.W700),
+    Font(R.font.pretendard_regular, FontWeight.W400),
+    Font(R.font.pretendard_medium, FontWeight.W500),
+    Font(R.font.pretendard_semibold, FontWeight.W600),
+    Font(R.font.pretendard_bold, FontWeight.W700),
 )
 
 private fun montageStyle(size: TextUnit, lineHeight: TextUnit, letterSpacing: TextUnit, weight: FontWeight) =

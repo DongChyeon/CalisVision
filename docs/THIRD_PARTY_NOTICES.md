@@ -37,16 +37,16 @@ SOFTWARE.
 
 ---
 
-## Pretendard Std 1.3.9 (font)
+## Pretendard 1.3.9 (font)
 
 - **Used for:** 앱 기본 서체 (Regular 400 / Medium 500 / SemiBold 600 / Bold 700). Montage v3.7.0이 Pretendard(JP 1.301)를 사용하므로 같은 계열을 채택.
-- **Files:** `app/src/main/res/font/pretendard_std_{regular,medium,semibold,bold}.otf` (원본 `PretendardStd-{Regular,Medium,SemiBold,Bold}.otf`, 파일명만 Android 리소스 규칙에 맞게 변경, 바이너리 무수정, 합계 1,272,556 bytes)
-- **Source:** https://github.com/orioncactus/pretendard/releases/tag/v1.3.9 (`PretendardStd-1.3.9.zip`, `public/static/`)
-- **License:** SIL Open Font License 1.1 (Reserved Font Name "Pretendard Std")
+- **Files:** `app/src/main/res/font/pretendard_{regular,medium,semibold,bold}.otf` (원본 `Pretendard-{Regular,Medium,SemiBold,Bold}.otf`, 한글 포함 전체판, 파일명만 Android 리소스 규칙에 맞게 변경, 바이너리 무수정, 합계 6,318,784 bytes)
+- **Source:** https://github.com/orioncactus/pretendard/releases/tag/v1.3.9 (`Pretendard-1.3.9.zip`, `public/static/`)
+- **License:** SIL Open Font License 1.1 (Reserved Font Name "Pretendard")
 
 ```
 Copyright (c) 2021, Kil Hyung-jin (https://github.com/orioncactus/pretendard),
-with Reserved Font Name Pretendard Std.
+with Reserved Font Name Pretendard.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

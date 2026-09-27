@@ -42,9 +42,9 @@ M3 타이포 매핑: display{Large,Medium,Small} = display{1,2,3}Bold, headline{
 | `holdSegmentHighlight` | `#383366FF` | `#385B84FF` | primary_normal_opacity22 |
 | `skeletonLine` | `#E0FFFFFF` | `#E0FFFFFF` | static_white_opacity88 (영상 프레임 위라 테마 무관) |
 
-서체: Montage는 Pretendard(JP 1.301, 굵기별 약 3.7MB OTF)를 쓴다. 풀 한글 Pretendard 1.3.9 static OTF 4종은 6.3MB, Variable TTF는 6.7MB라 예산(~2MB) 초과이고, 서브셋은 OFL 수정본이라 Reserved Font Name "Pretendard"를 쓸 수 없어 이름 변경이 필요하다. 그래서 저자가 공식 배포하는 **Pretendard Std 1.3.9**(라틴·그리스·키릴, 한글 없음) static OTF 4종(400/500/600/700)을 **무수정** 번들한다. 합계 1,272,556 bytes, 출처 https://github.com/orioncactus/pretendard/releases/tag/v1.3.9 (`PretendardStd-1.3.9.zip`). 한글 글리프는 시스템 서체(Noto Sans CJK KR 등)로 폴백된다.
+서체: Montage는 Pretendard를 쓴다. 처음에는 용량 때문에 라틴 전용 Pretendard Std(1.27MB)를 넣었으나, 앱 문구가 대부분 한글이라 한글만 시스템 서체로 폴백되어 한 문장 안에서 서체가 섞였다. **사용자 결정(2026-09-27)으로 한글 포함 Pretendard 1.3.9 static OTF 4종(400/500/600/700)을 무수정 번들**한다. 합계 6,318,784 bytes, 출처 https://github.com/orioncactus/pretendard/releases/tag/v1.3.9 (`Pretendard-1.3.9.zip`). 서브셋은 OFL상 재명명이 필요해 쓰지 않는다.
 
-라이선스 고지는 `docs/THIRD_PARTY_NOTICES.md`(Montage MIT 전문, Pretendard Std OFL 1.1 전문)와 토큰 파일 헤더 주석에 둔다.
+라이선스 고지는 `docs/THIRD_PARTY_NOTICES.md`(Montage MIT 전문, Pretendard OFL 1.1 전문)와 토큰 파일 헤더 주석에 둔다.
 
 ## Drivers
 1. 라이브러리 의존성 0 — 툴체인 호환성·권한·빌드 소스(JitPack) 리스크 제거 (사용자 결정)
@@ -62,16 +62,16 @@ M3 타이포 매핑: display{Large,Medium,Small} = display{1,2,3}Bold, headline{
 토큰 전사는 Montage의 시각 언어(색·타입·간격)를 얻으면서 라이브러리 채택의 위험(호환성·권한·크기)을 전부 피한다. Material 3 위에 매핑하므로 기존 M3 컴포넌트를 그대로 쓰고, 필요할 때만 `CalisTheme.*`로 세밀한 토큰에 접근한다. MIT라 값 복제·재배포에 제약이 없다.
 
 ## Consequences
+
+- (−) APK가 폰트만으로 약 6.3MB 커진다(라틴판 대비 +5.0MB). 용량이 문제가 되면 OFL에 따라 다른 이름으로 재명명한 한글 서브셋(KS X 1001 2350자)을 검토한다.
 - (+) 외부 의존성 0, INTERNET 권한 0 유지. 토큰이 코드에 있어 IDE 탐색·리팩터가 쉽다.
 - (+) 앱 역할 색(fault/warning/pose OK 등)이 Montage 상태 색과 일관되고 light/dark 모두 정의됨.
 - (−) Montage 업스트림 변경은 자동 반영되지 않는다. 수동 재동기화 필요.
 - (−) 컴포넌트(버튼·칩·바텀시트 등)는 없으므로 M3 컴포넌트를 토큰으로 스타일링해야 한다.
-- (−) 한글은 Pretendard가 아닌 시스템 서체로 렌더링되어 라틴/숫자와 서체가 섞인다(숫자·각도 표시는 Pretendard Std).
 - (−) debug APK +891,701 bytes(95,924,936 → 96,816,637, 서체 원본 1.27MB 압축 후).
 - (!) `*_opacityNN` 보조 색 전체는 전사하지 않았다(참조하는 것만 사용). 필요 시 원본에서 추가.
 
 ## Follow-ups
-- 한글 Pretendard가 필요해지면: KS X 1001 2350자 서브셋을 OFL에 따라 **다른 이름**(예: "CalisSans")으로 재명명해 번들하는 안을 검토(예상 4종 합계 ~2MB).
 - Montage 새 릴리스 시 `design_system_*_colors.xml`, `Typography.kt` diff로 토큰 재동기화.
 - 분석 화면 구현 시 `CalisTheme.appColors` 역할이 부족하면(예: 관절별 색) 이 ADR에 역할 추가.
 - 스켈레톤 오버레이의 가독성(밝은 배경 영상 위 흰 선)을 실기기에서 확인, 필요 시 외곽선(`staticBlack` opacity) 추가.
