@@ -2,9 +2,13 @@ package com.calisvision.domain.analysis
 
 import com.calisvision.domain.TestPoses
 import com.calisvision.domain.model.PoseLandmark
+import com.calisvision.fixtures.PoseFixture
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Random
 
 class HoldSegmentDetectorTest {
 
@@ -55,5 +59,31 @@ class HoldSegmentDetectorTest {
     @Test
     fun tooShortIsNull() {
         assertNull(HoldSegmentDetector.detect(frames(List(14) { 0f }), aspect = 1f))
+    }
+
+    @Test
+    fun tuneFixtureBoundariesSurviveLandmarkNoise() {
+        val fixture = PoseFixture.load("/fixtures/wall_handstand_tune.json")!!
+        val clean = HoldSegmentDetector.detect(fixture.frames, fixture.aspect)
+        assertNotNull(clean)
+        clean!!
+        assertTrue("clean hold $clean too short", clean.last - clean.first + 1 >= 80)
+
+        val noisy = (1L..24L).map { seed ->
+            val rnd = Random(seed)
+            val frames = fixture.frames.map { f ->
+                f.copy(landmarks = f.landmarks?.map { l ->
+                    l.copy(x = l.x + 0.002f * rnd.nextGaussian().toFloat(), y = l.y + 0.002f * rnd.nextGaussian().toFloat())
+                })
+            }
+            HoldSegmentDetector.detect(frames, fixture.aspect)
+        }
+        assertTrue("hold lost under noise: $noisy", noisy.all { it != null })
+        val ranges = noisy.filterNotNull() + listOf(clean)
+        val startSpread = ranges.maxOf { it.first } - ranges.minOf { it.first }
+        val endSpread = ranges.maxOf { it.last } - ranges.minOf { it.last }
+        println("clean $clean, noisy start spread $startSpread, end spread $endSpread: $noisy")
+        assertTrue("start spread $startSpread: $ranges", startSpread <= 3)
+        assertTrue("end spread $endSpread: $ranges", endSpread <= 3)
     }
 }
