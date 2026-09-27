@@ -3,7 +3,7 @@
 - 일자: 2026-09-27
 - 기기: Samsung SM-F766N, Android 16 (SDK 36), adb serial R3KL202BBMJ
 - 코드: `develop`, 테스트 `app/src/androidTest/java/com/calisvision/PoseSpikeInstrumentedTest.kt`
-  (프로덕션 `RetrieverFrameSource` · `OrientationResolver` · `MediaPipePoseDetector` · `PoseLandmarkerEngine` · `AnalysisResult.assemble` 그대로 사용)
+  (프로덕션 `RetrieverFrameSource`(→ 순차 디코딩 후 `CodecFrameSource`, 아래 "성능 개선") · `OrientationResolver` · `MediaPipePoseDetector` · `PoseLandmarkerEngine` · `AnalysisResult.assemble` 그대로 사용)
 - 실행: `./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.calisvision.PoseSpikeInstrumentedTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true`
   (마지막 플래그는 AGP의 실행 후 앱 제거로 `getExternalFilesDir` 결과가 지워지는 것을 막기 위함)
 - 모델: `pose_landmarker_full.task`, MediaPipe tasks-vision 1.0.0, CPU, 신뢰도 0.5, 샘플 10fps, 긴 변 640px
@@ -77,12 +77,28 @@
 
 - **카메라 각도**: 카메라가 바닥 근처에서 약간 올려다보는 구도(가이드의 "엉덩이 높이 삼각대"와 다름). 원근 왜곡으로 어깨·팔꿈치 각도가 실제와 다르게 측정될 수 있어 위 θ 통계를 기준값으로 쓰기 전에 가이드 구도 영상으로 재확인 필요.
 - rot180 사본은 원본보다 visibility가 낮고(0.89 vs 0.98) 홀드 구간이 짧게 검출됨(23 vs 94 샘플). 재인코딩 차이 또는 직립 방향 지터로 추정 — 방향 비의존성이 완전하지 않다는 신호.
-- **성능(⑤)**: 원본 13s 영상 41–47s → 30s 영상 환산 약 95–110s로 NFR(≤ 60s) **초과 추세**. 디코드가 60% 이상. `OPTION_CLOSEST`는 GOP 길이에 비례(GOP 8.3s인 rot180 사본은 프레임당 0.5–0.9s). B1'(`getFramesAtIndex`) 전환 검토 필요.
+- **성능(⑤)**: 원본 13s 영상 41–47s → 30s 영상 환산 약 95–110s로 NFR(≤ 60s) **초과 추세**. 디코드가 60% 이상. `OPTION_CLOSEST`는 GOP 길이에 비례(GOP 8.3s인 rot180 사본은 프레임당 0.5–0.9s). → 아래 "성능 개선"에서 해결(30s 영상 55.5s).
+
+## 성능 개선 — 순차 디코딩 (2026-09-27)
+
+`RetrieverFrameSource`(샘플마다 `getFrameAtTime(OPTION_CLOSEST)` = 직전 키프레임부터 재디코드 + 전체 해상도 RGB 변환)를 `CodecFrameSource`로 교체: MediaExtractor + MediaCodec(YUV ByteBuffer 출력)로 순차 디코드하고 **샘플 프레임만** RGB 변환(BT.709 limited, chroma 최근접 복제 — 이 기기의 `getFrameAtTime`과 전체 해상도 평균 |ΔRGB| 0.03) → 회전 메타 적용 → 640px bilinear 다운스케일. `PoseLandmarkerEngine`은 디코드를 IO 스레드에서 돌리고 버퍼 2장으로 추론과 겹친다. 30s 영상은 튜닝 영상을 `ffmpeg -stream_loop 2 -t 30 -c copy`로 이어 붙인 `wall_handstand_tune_30s.mp4`(30.0s, 900프레임).
+
+| 영상 | 디코드 ms/샘플 (IO, 추론과 병렬) | 추론 ms/프레임 | resolve / process | 총 분석 | 이전 |
+|---|---|---|---|---|---|
+| tune 13.0s (131 샘플) | 99.6 | 102.5 | 3.5s / 14.6s | **18.1 s** | 41.1–47.4 s |
+| rot180 사본 13.0s (GOP 8.3s) | 130.8 | 158.6 | 9.5s / 22.1s | **31.6 s** | 85.6–149.9 s |
+| tune_30s 30.0s (301 샘플) | 120.0 | 147.1 | 9.0s / 46.5s | **55.5 s** ≤ 60s ✓ | 환산 95–110 s |
+
+- 1회 실행 값(연속 실행 마지막이라 추론이 발열로 102 → 147ms로 느려짐). NFR-2는 **충족, 여유 4.5s** — process 구간은 이제 추론 병목(샘플당 155ms ≈ 추론 147ms)이라 추가 단축은 GPU delegate 쪽.
+- 동등성(이전 경로 대비): tune 검출 100%(동일), 평균 visibility **0.9777**(이전 0.9779), frontSign +1·side LEFT 동일, 방향 score 0.742/0.710(이전 0.743/0.709); rot180 검출 100%(이전 99.2%), visibility 0.879(이전 0.888); (a) meta90 회전 방향·크기 일치(|ΔRGB| 0.03); (b) |P − flip(L)| 0.0028.
+- 홀드 구간은 tune 42..121(이전 28..121). 이전 프레임에 ±1 LSB 무작위 노이즈만 더해도 28..130 / 41..130으로 흔들리고(landmark 평균 차 0.0022, 새 경로 0.0023과 같은 수준), 즉 **`HoldSegmentDetector` 경계가 잡음 수준 입력 변화에 민감**하다 — 디코더 문제가 아니라 P2/P4 확인 사항.
+- 기각한 대안(실측): `getFramesAtIndex` 배치(ARGB, 픽셀 동일) — 30 fps 영상에서 샘플 사이 프레임까지 모두 RGB 변환해 30s 65.8–67.0s(NFR 미달). 같은 방식 RGB_565 — 2배 빠르지만 visibility 0.895. SurfaceTexture/GL 변환 — 디코드 35–59ms로 가장 빠르지만 경계부 |ΔRGB| 2.5로 visibility 0.886(노이즈 ±1 LSB는 0.978 유지 → 우연 오차가 아니라 체계적 차이).
+- 제약: 8-bit 4:2:0 전제(10-bit/HDR 미지원), 샘플 k는 pts ≥ k·100ms − 반 프레임인 첫 프레임(CFR 가정, VFR은 어긋날 수 있음, `displayTimeMs`는 요청 시각 유지).
 
 ## 다음 단계
 
 1. ~~방향 게이트 재정의 여부 결정(ADR)~~ — ADR-0006으로 결정(재정의 후 PASS). 180° 경로는 Matrix 회전으로 교체.
-2. NFR 초과 → B1' 디코드(`getFramesAtIndex` 또는 MediaCodec 순차 디코드) 시험, 추론 GPU delegate 시험.
+2. ~~NFR 초과 → 순차 디코드 시험~~ — `CodecFrameSource`로 30s 55.5s(아래). 여유가 4.5s뿐이라 발열 시 초과 가능 → 추론 GPU delegate 시험(P4).
 3. 어깨 열림·팔꿈치 Range의 부호/기본값을 튜닝 fixture(`app/src/test/resources/fixtures/wall_handstand_tune.json`)로 P2/P4에서 보정.
 4. 가이드 구도(엉덩이 높이 카메라) 영상 추가 확보.
 5. P4: hold-out fixture를 테스트 리소스로 옮겨 `WallHandstandAlignmentTest`(AC-4) 실행.

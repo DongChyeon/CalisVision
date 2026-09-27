@@ -3,8 +3,11 @@ package com.calisvision.pose
 import android.graphics.Bitmap
 import com.calisvision.domain.model.FramePose
 import com.calisvision.video.FrameSource
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.flowOn
 import java.io.File
 
 /** [width] × [height] is the first decoded (downscaled) frame, 0 × 0 when none decoded. */
@@ -24,7 +27,8 @@ class PoseLandmarkerEngine(private val detectorFactory: () -> PoseDetector) {
         var height = 0
         frameDir?.mkdirs()
         detectorFactory().use { detector ->
-            source.frames().collect { frame ->
+            // Decode on IO while inference runs here; a small buffer bounds the downscaled bitmaps held in flight.
+            source.frames().buffer(FRAME_BUFFER).flowOn(Dispatchers.IO).collect { frame ->
                 currentCoroutineContext().ensureActive()
                 if (height == 0) {
                     width = frame.bitmap.width
@@ -49,5 +53,6 @@ class PoseLandmarkerEngine(private val detectorFactory: () -> PoseDetector) {
 
     private companion object {
         const val JPEG_QUALITY = 85
+        const val FRAME_BUFFER = 2
     }
 }

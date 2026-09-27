@@ -21,8 +21,8 @@ import com.calisvision.pose.PoseDetector
 import com.calisvision.pose.PoseLandmarkerEngine
 import com.calisvision.test.RequiresVideo
 import com.calisvision.test.TestVideos
+import com.calisvision.video.CodecFrameSource
 import com.calisvision.video.FrameSource
-import com.calisvision.video.RetrieverFrameSource
 import com.calisvision.video.SampledFrame
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -70,6 +70,11 @@ class PoseSpikeInstrumentedTest {
         videos.put("${TUNE}_rot180", rotRun.json)
         rotRun.json.put("sideMatchesOriginal", rotRun.result.orientation?.side == tuneRun.result.orientation?.side)
 
+        // NFR-2 timing: tune looped to 30 s (ffmpeg -stream_loop 2 -t 30 -c copy), when pushed.
+        File(dir, "${TUNE}_30s.mp4").takeIf { it.exists() }?.let {
+            videos.put("${TUNE}_30s", analyze(it, expectedRotation = 180, withTheta = false).json)
+        }
+
         val holdout = File(dir, "$HOLDOUT.mp4")
         if (holdout.exists()) {
             // Reserved for P4: export the fixture only; angles are neither computed nor inspected here.
@@ -94,20 +99,21 @@ class PoseSpikeInstrumentedTest {
         val uri = Uri.fromFile(file)
         val decodeMs = mutableListOf<Double>()
         val inferMs = mutableListOf<Double>()
-        var totalMs = 0.0
+        var processMs = 0.0
+        var resolveMs = 0.0
         lateinit var scores: Pair<Float, Float>
-        val (rotation, processed) = RetrieverFrameSource.open(context, uri).use { raw ->
+        val (rotation, processed) = CodecFrameSource.open(context, uri).use { raw ->
             val source = TimedFrameSource(raw, decodeMs)
             val rotation = MediaPipePoseDetector(context).use { detector ->
                 scores = orientationScores(raw, detector)
                 // Total analysis time = production resolve + process (the extra scoring pass above is excluded).
                 val start = System.nanoTime()
-                OrientationResolver.resolve(raw, exercise, detector).also { totalMs += elapsedMs(start) }
+                OrientationResolver.resolve(raw, exercise, detector).also { resolveMs = elapsedMs(start) }
             }
             val start = System.nanoTime()
             val processed = PoseLandmarkerEngine { TimedDetector(MediaPipePoseDetector(context), inferMs) }
                 .process(source, rotation, frameDir = null) { _, _ -> }
-            totalMs += elapsedMs(start)
+            processMs = elapsedMs(start)
             rotation to processed
         }
         val result = AnalysisResult.assemble(
@@ -155,7 +161,9 @@ class PoseSpikeInstrumentedTest {
                     .put("inferenceMsPerFrame", inferMs.average())
                     .put("decodeFrames", decodeMs.size)
                     .put("inferenceFrames", inferMs.size)
-                    .put("totalAnalysisMs", totalMs),
+                    .put("resolveMs", resolveMs)
+                    .put("processMs", processMs)
+                    .put("totalAnalysisMs", resolveMs + processMs),
             )
         if (orientation != null) {
             json.put("meanVisibility", visibility(result.frames, orientation))
@@ -237,14 +245,19 @@ class PoseSpikeInstrumentedTest {
         .put("z", l.z.toDouble())
         .put("visibility", l.visibility.toDouble())
 
-    /** (a): does getFrameAtTime apply the container's rotation metadata to the decoded bitmap? */
+    /**
+     * (a): does getFrameAtTime apply the container's rotation metadata to the decoded bitmap, and does the production
+     * frame source match it? `pixelDiffVsGetFrameAtTime` = mean |ΔRGB| (0–255) between the frame source's mid-video frame
+     * and getFrameAtTime(OPTION_CLOSEST) of the same time downscaled to the same size — small only if the rotation
+     * direction, scaling and color conversion agree.
+     */
     private fun probeRotation(original: File, meta90: File): JSONObject {
-        fun probe(file: File): JSONObject = RetrieverFrameSource.open(context, Uri.fromFile(file)).use { source ->
+        fun probe(file: File): JSONObject = CodecFrameSource.open(context, Uri.fromFile(file)).use { source ->
             val frame = source.frameAt(source.info.frameCount / 2)
             val full = MediaMetadataRetriever().run {
                 try {
                     setDataSource(file.absolutePath)
-                    getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST)
+                    getFrameAtTime((frame?.displayTimeMs ?: 0L) * 1000L, MediaMetadataRetriever.OPTION_CLOSEST)
                 } finally {
                     release()
                 }
@@ -254,6 +267,7 @@ class PoseSpikeInstrumentedTest {
                 .put("metadataSize", "${source.info.width}x${source.info.height}")
                 .put("fullBitmap", full?.let { "${it.width}x${it.height}" } ?: JSONObject.NULL)
                 .put("frameSourceBitmap", frame?.let { "${it.bitmap.width}x${it.bitmap.height}" } ?: JSONObject.NULL)
+                .put("pixelDiffVsGetFrameAtTime", if (frame != null && full != null) pixelDiff(frame.bitmap, full) else JSONObject.NULL)
                 .also {
                     full?.recycle()
                     frame?.bitmap?.recycle()
@@ -263,6 +277,20 @@ class PoseSpikeInstrumentedTest {
         val meta = probe(meta90)
         val autoApplied = orig.getString("fullBitmap") != meta.getString("fullBitmap")
         return JSONObject().put("original", orig).put("meta90", meta).put("rotationAutoApplied", autoApplied)
+    }
+
+    private fun pixelDiff(frame: Bitmap, full: Bitmap): Double {
+        val scaled = Bitmap.createScaledBitmap(full, frame.width, frame.height, true)
+        var sum = 0L
+        var n = 0
+        for (y in 0 until frame.height step 2) for (x in 0 until frame.width step 2) {
+            val p = frame.getPixel(x, y)
+            val q = scaled.getPixel(x, y)
+            for (shift in intArrayOf(16, 8, 0)) sum += abs((p shr shift and 255) - (q shr shift and 255))
+            n += 3
+        }
+        if (scaled !== full) scaled.recycle()
+        return sum.toDouble() / n
     }
 
     /**
@@ -280,8 +308,8 @@ class PoseSpikeInstrumentedTest {
         var detectedAt180 = 0
         val perFrame = JSONArray()
         MediaPipePoseDetector(context).use { detector ->
-            RetrieverFrameSource.open(context, Uri.fromFile(original)).use { origSource ->
-                RetrieverFrameSource.open(context, Uri.fromFile(rot180)).use { rotSource ->
+            CodecFrameSource.open(context, Uri.fromFile(original)).use { origSource ->
+                CodecFrameSource.open(context, Uri.fromFile(rot180)).use { rotSource ->
                     for (index in hold) {
                         if (flipDiffs.size >= PROBE_FRAMES) break
                         val o = origSource.frameAt(index) ?: continue

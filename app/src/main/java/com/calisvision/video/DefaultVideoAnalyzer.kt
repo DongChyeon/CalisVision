@@ -27,7 +27,7 @@ class DefaultVideoAnalyzer(
         val sessionId = UUID.randomUUID().toString()
         val frameDir = File(context.cacheDir, "${CalisVisionApp.ANALYSIS_DIR}/$sessionId")
         val result = try {
-            RetrieverFrameSource.open(context, uri).use { source ->
+            CodecFrameSource.open(context, uri).use { source ->
                 val rotation = detectorFactory().use { OrientationResolver.resolve(source, exercise, it) }
                 val processed = PoseLandmarkerEngine(detectorFactory).process(source, rotation, frameDir) { done, total ->
                     emit(AnalysisProgress.Processing(done, total))
