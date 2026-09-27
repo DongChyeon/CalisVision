@@ -159,3 +159,26 @@ AlignmentGateResult(passed=false, ratio=0.19148937, holdSamples=47, reason=hold 
 - P1.5 육안 확인과 일치: tune은 손이 벽에서 떨어져 몸이 벽 쪽으로 ~19° 기운 벽 물구나무(어깨 닫힘 −23°)이고 카메라가 바닥 근처에서 올려다보는 구도다(가이드 "엉덩이 높이"와 다름) — 2D 원근으로 정렬 각이 왜곡될 수 있다.
 - tune 홀드도 영상 마지막 샘플(130)까지 이어진다 — 두 영상 모두 홀드 중에 녹화가 끝나, 홀드 길이는 "홀드 시작 후 녹화가 얼마나 이어졌나"에 좌우된다.
 - 선택지(사용자 결정): (1) 가이드 구도(엉덩이 높이, 몸과 수직, 홀드 7 s 이상, 홀드가 끝난 뒤 녹화 종료)로 새 hold-out 재촬영, (2) AC-4 게이트(폭 [175,185]/95%) 재정의 ADR, (3) 현 결과를 FAIL로 확정하고 fixture 커밋(테스트 red 유지). 파라미터를 재보정한다면 새 hold-out이 필요하다(이 hold-out은 이미 평가·열람됨).
+
+## 모델·가속 비교 (full/heavy × CPU/GPU)
+
+`ModelDelegateBenchmarkTest#compare`(프로덕션 CodecFrameSource → OrientationResolver → PoseLandmarkerEngine → assemble, 프레임 JPEG 저장 없음, 설정 사이 30 s 휴지). heavy는 `pose_landmarker_heavy.task`(float16 latest, 29.2 MB)를 테스트용으로만 `<external files>/models/`에 push(미커밋). GPU는 `BaseOptions.setDelegate(Delegate.GPU)` — 생성 실패 시 CPU 폴백·로그(`PoseDetector` 태그), 이 기기에서는 네 설정 모두 요청한 delegate로 생성됨(폴백 없음). Δθ = tune 홀드(full-CPU 기준 14..130)에서 스무딩 θ의 full-CPU 대비 평균 |Δ|.
+
+| 설정 | 검출률 | 평균 visibility (tune / 30s) | 추론 ms/프레임 (tune / 30s) | 총 분석 tune 13 s | 총 분석 30 s | tune 홀드 | Δθ 정렬 / 골반 / 어깨 / 팔꿈치 |
+|---|---|---|---|---|---|---|---|
+| **full-CPU (현행)** | 100% | 0.978 / 0.978 | 112 / 105 | 21.8 s | **39.9 s** | 14..130 | 기준 |
+| full-GPU | 100% | 0.978 / 0.977 | 52 / 54 | 18.5 s | 35.9 s | 14..130 | 0.26 / 0.41 / 0.55 / 0.99° |
+| heavy-CPU | 100% | 0.660 / 0.656 | 245 / 249 | 42.5 s | 84.7 s ✗ | **없음** | 0.76 / 0.27 / 1.79 / 5.65° |
+| heavy-GPU | 100% | 0.688 / 0.687 | 82 / 77 | 21.1 s | 41.1 s | 18..55 | 1.05 / 1.80 / 1.86 / 5.59° |
+
+발열(`ModelDelegateBenchmarkTest#thermal30s`, 30 s 영상 연속 3회, CPU 3회 직후 GPU 3회):
+
+| 설정 | 30 s 총 분석 min / median / max | 추론 ms/프레임 |
+|---|---|---|
+| full-CPU | **42.0 / 42.1 / 43.0 s** | 112–115 |
+| full-GPU | 40.6 / 40.7 / 41.5 s | 63–64 |
+
+- **채택 없음 — full-CPU 유지.** NFR-2(30 s ≤ 60 s)는 현행 CPU로 여유 17 s(최대 43.0 s)로 충족. GPU는 추론을 절반으로 줄이지만 총 분석은 1–4 s(3–10%)만 줄어든다 — process 구간이 이제 디코드(샘플당 ~120 ms, IO 스레드) 병목이라서. 각도 일치는 기준(~1°) 안이지만 이득이 작아 "가장 작은 변경" 원칙에 따라 채택하지 않았다.
+- heavy는 두 delegate 모두 4규칙 관절 visibility가 0.66–0.69로 떨어져(가시성 기준 미달 프레임 증가) tune 홀드를 잃거나(CPU) 크게 줄이고(GPU 18..55), 팔꿈치 Δθ 5.6°. heavy-CPU는 NFR 초과. 기각.
+- P1.5 기록의 30 s 55.5 s는 연속 실행 끝의 발열 상태 값(추론 147 ms)이었고, 이번 측정은 추론 105–115 ms 상태다.
+- `MediaPipePoseDetector`는 모델 경로·delegate 인자(기본 full·CPU)와 CPU 폴백을 갖는다 — 벤치마크용 seam이며 프로덕션 기본값은 변화 없음.

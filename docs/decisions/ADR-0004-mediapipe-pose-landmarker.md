@@ -32,4 +32,5 @@ Accepted
 ## Follow-ups
 - P1.5 게이트(검출률 ≥90%, 평균 visibility ≥0.5, 방향 선택 정확, front 부호 정확도 100%) 실패 시 heavy 모델·GPU delegate 또는 RTMPose/TFLite로 재평가한다.
 - P1.5 실측(2026-09-27, SM-F766N, `docs/VERIFICATION.md`): 검출률 100%(원본 131/131) / 99.2%(rot180 사본), 평균 visibility 0.978 / 0.888, frontSign +1 둘 다 정답. 방향은 두 영상 모두 0° 선택(score 원본 0.743 vs 180° 0.083, 사본 0.592 vs 0.000) — `setRotationDegrees(180)`은 검출을 거의 무력화(홀드 94프레임 중 1), 비트맵 Matrix 회전 시 score 0.709 / 0.537. 방향 기준은 ADR-0006으로 재정의되어 게이트 PASS, 본 ADR 확정. 성능은 13s 영상 41–47s(디코드 171–190 ms/프레임, 추론 104–121 ms/프레임)로 NFR-2 초과 추세.
-- P4에서 full vs heavy × CPU vs GPU 비교표를 작성한다.
+- P4 비교(2026-09-27, SM-F766N, `ModelDelegateBenchmarkTest`, 표는 `docs/VERIFICATION.md` "모델·가속 비교"): 30 s 영상 총 분석 full-CPU 39.9 s(연속 3회 42.0/42.1/43.0 s), full-GPU 35.9 s(40.6/40.7/41.5 s, 추론 105→54 ms, Δθ ≤ 0.99°), heavy-CPU 84.7 s, heavy-GPU 41.1 s. heavy는 visibility 0.66–0.69로 떨어지고 tune 홀드를 잃거나 줄임(팔꿈치 Δθ 5.6°) → 기각. GPU는 디코드 병목으로 총 이득 3–10%뿐이라 **full-CPU 유지**. `MediaPipePoseDetector`에 모델 경로·delegate 인자와 GPU 생성 실패 시 CPU 폴백을 두어 재평가 가능.
+- 디코드(샘플당 ~120 ms)를 줄이면 추론이 다시 병목이 되므로 그때 GPU delegate(추론 절반)를 재검토한다.
