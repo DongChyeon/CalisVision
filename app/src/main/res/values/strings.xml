@@ -1,3 +1,31 @@
 <resources>
     <string name="app_name">CalisVision</string>
+
+    <!-- 공통 -->
+    <string name="action_back">뒤로</string>
+
+    <!-- 홈 -->
+    <string name="home_subtitle">측면 영상 한 편으로 자세를 프레임 단위로 확인합니다.</string>
+    <string name="home_section_exercises">동작</string>
+    <string name="home_exercise_desc_handstand">측면 영상으로 정렬·어깨·골반·팔꿈치를 봅니다</string>
+    <string name="home_coming_soon">준비 중</string>
+    <string-array name="home_coming_soon_exercises">
+        <item>프론트레버</item>
+    </string-array>
+    <string name="home_start">영상 분석 시작</string>
+
+    <!-- 촬영 가이드 -->
+    <string name="guide_title">촬영 가이드</string>
+    <string name="guide_headline">이렇게 찍어 주세요</string>
+    <string name="guide_view_label">촬영 방향</string>
+    <string name="guide_tip_side_title">측면 90°</string>
+    <string name="guide_tip_side_body">몸의 옆면이 카메라를 향하게 두세요</string>
+    <string name="guide_tip_height_title">엉덩이 높이 · 삼각대</string>
+    <string name="guide_tip_height_body">카메라를 수평으로 고정하세요</string>
+    <string name="guide_tip_distance_title">2–3m · 전신</string>
+    <string name="guide_tip_distance_body">손끝부터 발끝까지 프레임 안에 들어오게</string>
+    <string name="guide_tip_hold_title">5초 이상 홀드</string>
+    <string name="guide_tip_hold_body">10–20초 영상이면 충분합니다</string>
+    <string name="guide_faults_covered">이 촬영으로 확인하는 자세</string>
+    <string name="guide_pick_video">갤러리에서 영상 고르기</string>
 </resources>

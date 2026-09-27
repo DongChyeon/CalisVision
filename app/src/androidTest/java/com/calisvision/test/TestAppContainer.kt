@@ -1,6 +1,10 @@
 package com.calisvision.test
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContract
 import com.calisvision.data.AppContainer
 import com.calisvision.domain.analysis.AngleTimeline
 import com.calisvision.domain.model.AnalysisResult
@@ -12,7 +16,24 @@ import kotlinx.coroutines.flow.flowOf
 
 class TestAppContainer(
     override val analyzer: VideoAnalyzer = FakeAnalyzer(),
+    override val pickVideo: FakePickVideo = FakePickVideo(),
 ) : AppContainer
+
+/** Returns [result] synchronously instead of opening the system picker; [launches] counts picker opens. */
+class FakePickVideo(var result: Uri? = Uri.parse("content://com.calisvision.test/video.mp4")) :
+    ActivityResultContract<PickVisualMediaRequest, Uri?>() {
+    var launches = 0
+        private set
+
+    override fun createIntent(context: Context, input: PickVisualMediaRequest): Intent = error("picker must not start an activity in tests")
+
+    override fun getSynchronousResult(context: Context, input: PickVisualMediaRequest): SynchronousResult<Uri?> {
+        launches++
+        return SynchronousResult(result)
+    }
+
+    override fun parseResult(resultCode: Int, intent: Intent?): Uri? = null
+}
 
 class FakeAnalyzer(
     private val progress: (Uri) -> List<AnalysisProgress> = { listOf(AnalysisProgress.Completed(emptyResult(it))) },
