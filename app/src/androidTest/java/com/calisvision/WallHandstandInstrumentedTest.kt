@@ -33,13 +33,13 @@ class WallHandstandInstrumentedTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Test
-    fun exportHoldoutFixture() = export(HOLDOUT)
+    fun exportHoldoutFixture() = export(HOLDOUT, video = HOLDOUT_VIDEO)
 
     @Test
     fun exportTuneFixture() = export(TUNE)
 
-    private fun export(name: String): Unit = runBlocking {
-        val video = File(TestVideos.dir(context), "$name.mp4")
+    private fun export(name: String, video: String = name): Unit = runBlocking {
+        val video = File(TestVideos.dir(context), "$video.mp4")
         assumeTrue("video missing: $video", video.exists())
         val start = System.nanoTime()
         val result = when (val end = DefaultVideoAnalyzer(context).analyze(Uri.fromFile(video)).filter { it.isTerminal() }.first()) {
@@ -87,5 +87,6 @@ class WallHandstandInstrumentedTest {
         const val TAG = "WallHandstand"
         const val TUNE = "wall_handstand_tune"
         const val HOLDOUT = "wall_handstand_holdout"
+        const val HOLDOUT_VIDEO = "wall_handstand_holdout3" // 재촬영본; fixture 이름은 JVM 테스트용으로 유지
     }
 }

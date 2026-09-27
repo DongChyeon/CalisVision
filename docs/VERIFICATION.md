@@ -164,6 +164,35 @@ AlignmentGateResult(passed=false, ratio=0.19148937, holdSamples=47, reason=hold 
 - 주의: tune(손 보임)도 43.6%라 실제 홀드 중 자세 흔들림(±9°)만으로도 ±5°/95% 게이트는 빡빡하다. 재촬영 결과도 FAIL이면 그때 게이트 재정의(ADR)를 논의한다.
 - 후속 과제: 가려진 관절을 visibility만으로 거르지 못하므로, 물리적으로 불가능한 각도(예: 팔꿈치 > 230°)나 프레임 간 급변을 "측정 불가"로 처리하는 방어 규칙을 검토한다.
 
+## hold-out 재촬영 (holdout3) AC-4 재판정: **FAIL**
+
+- 입력: `wall_handstand_holdout3.mp4` — 13.9 s, HEVC 1080×1192, 회전 메타 없음, avg fps 30.07(2145280/71339, 약간 VFR; `CodecFrameSource`는 CFR 가정). 첫 hold-out(쿠션에 손 가림) FAIL 이후 사용자 재촬영, `holdout2`는 발목이 프레임 밖이라 평가 전 기각.
+- 촬영 조건: 손·발 가림 없음, 몸 거의 수직, 손이 벽 가까이. **주의 사항 두 가지**: (1) 카메라가 다시 바닥 근처(가이드의 엉덩이 높이 아님) — 올려다보는 원근, (2) 발이 화면 위쪽 가장자리에 닿음(발끝 y 최소 0.022, 발목 y 최소 0.037).
+- 파라미터 동결(임계값·스무딩·`HoldSegmentDetector`·규칙·모델 full·CPU 변경 없음), **1회만** 평가. 경로는 위와 같다 — `WallHandstandInstrumentedTest#exportHoldoutFixture`가 입력만 `wall_handstand_holdout3.mp4`로 바꿔 `wall_handstand_holdout.json`으로 export → `adb pull` → `WallHandstandAlignmentTest`(실행됨, skip 아님).
+
+```
+hold segment 24..139: 116 samples
+AlignmentGateResult(passed=false, ratio=0.61206895, holdSamples=116, reason=aligned ratio 0.61206895 < 0.95)
+```
+
+| 항목 | holdout3 |
+|---|---|
+| 샘플 / 검출 | 140 / 140 (100%) |
+| 선택 회전 · side · frontSign | 0° · LEFT · +1 |
+| 6규칙 관절 평균 visibility (LEFT, 전체 / 홀드) | 0.985 / 0.987 — WRIST 0.978, ELBOW 0.996, SHOULDER 0.999, HIP 0.999, KNEE 0.986, ANKLE 0.963 (홀드) |
+| 발목 visibility (LEFT, 홀드 평균 / 최소) | 0.963 / 0.943 (반대쪽 RIGHT 0.534 — 가려진 쪽) |
+| 홀드 구간 (길이) | 24..139 (116) ≥ 50 ✓ — 영상 마지막 샘플(139 = 13.9 s)에서 끝남 |
+| 스무딩 정렬 θ ∈ [175,185] (null 0) | **61.2%** < 95% → FAIL (raw도 61.2%) |
+| 정렬 θ 평균 / 최소 / 최대 | 184.9 / 181.9 / 189.2 |
+| 골반/허리 평균 (최소–최대) | 187.0 (185.1–189.6) |
+| 어깨 열림 평균 (최소–최대) | 158.2 (153.4–168.1) |
+| 팔꿈치 평균 (최소–최대) | 198.2 (190.2–203.6) — 첫 hold-out의 267° 같은 불가능한 값 없음 |
+
+- 홀드 안 결함(clip): 어깨 닫힘 `closed_shoulder` 31..139 (−26.6°) 하나. 홀드 밖: `closed_shoulder` 0..4, 8..12.
+- 정렬 θ는 전 구간 181.9–189.2로 **모두 175 위(바나나 쪽)** 이다. 실패 샘플 45개는 홀드 진입 직후(~1.5 s, 186–189°)와 끝부분(~2 s, 185.4–189°)에 몰려 있고, 가운데 ~7 s는 182–185.7°로 대부분 게이트 안이다.
+- landmark 육안 확인(판정 이후, 파라미터 조정 없음): 홀드 샘플 62(6.2 s)·101(10.1 s)에 LEFT 손목·팔꿈치·어깨·엉덩이·무릎·발목을 찍은 결과 **6개 모두 몸 위에 놓인다**(손목은 바닥의 손, 발목은 화면 위 가장자리의 발). 첫 hold-out 같은 가림·오검출은 보이지 않는다. 앞쪽 이불이 손 바로 아래까지 올라와 있지만 손목은 보인다.
+- fixture: **커밋하지 않았다**(커밋하면 `testDebugUnitTest`가 AC-4로 red). 사용자 결정 대기 — 게이트 재정의(ADR) 여부. 입력 변경(`HOLDOUT_VIDEO`)만 커밋.
+
 ## 모델·가속 비교 (full/heavy × CPU/GPU)
 
 `ModelDelegateBenchmarkTest#compare`(프로덕션 CodecFrameSource → OrientationResolver → PoseLandmarkerEngine → assemble, 프레임 JPEG 저장 없음, 설정 사이 30 s 휴지). heavy는 `pose_landmarker_heavy.task`(float16 latest, 29.2 MB)를 테스트용으로만 `<external files>/models/`에 push(미커밋). GPU는 `BaseOptions.setDelegate(Delegate.GPU)` — 생성 실패 시 CPU 폴백·로그(`PoseDetector` 태그), 이 기기에서는 네 설정 모두 요청한 delegate로 생성됨(폴백 없음). Δθ = tune 홀드(full-CPU 기준 14..130)에서 스무딩 θ의 full-CPU 대비 평균 |Δ|.
@@ -217,10 +246,10 @@ AlignmentGateResult(passed=false, ratio=0.19148937, holdSamples=47, reason=hold 
 
 | AC | 상태 | 근거 |
 |---|---|---|
-| AC-1 검출 ≥ 90% | PASS | tune 131/131, hold-out 177/177, tune_30s 301/301 (`WallHandstandInstrumentedTest`, `ModelDelegateBenchmarkTest`); rot180 사본 100% (P1.5) |
+| AC-1 검출 ≥ 90% | PASS | tune 131/131, hold-out 177/177, holdout3 140/140, tune_30s 301/301 (`WallHandstandInstrumentedTest`, `ModelDelegateBenchmarkTest`); rot180 사본 100% (P1.5) |
 | AC-2 4규칙 각도/null | PASS | `AngleTimelineTest`, 결과 패널 4행(`DeviceSmokeTest` 스크린샷) |
 | AC-3 FaultSegment ≥ 3샘플·부호별·병합 | PASS | `FaultEvaluatorTest`, `FaultSheetTest.mergedPikeShowsBothRuleAngles` |
-| AC-4 hold-out 정렬 게이트 | **FAIL** | `WallHandstandAlignmentTest`: 홀드 130..176 = 47 < 50 샘플, θ∈[175,185] 19.1%(평균 190.9°). tune도 43.6% — 위 "AC-4" 참고. fixture 미커밋(사용자 결정) |
+| AC-4 hold-out 정렬 게이트 | **FAIL** | 재촬영 holdout3: 홀드 24..139 = 116 샘플 ✓, θ∈[175,185] **61.2%** < 95%(평균 184.9°, 181.9–189.2) — 위 "hold-out 재촬영 (holdout3)". 첫 hold-out: 홀드 47 < 50, 19.1%(손 가림). fixture 미커밋(사용자 결정) |
 | AC-5 INTERNET 0 · 비행기 모드 | PASS | aapt2 INTERNET 0; 비행기 모드+Wi-Fi off `DeviceSmokeTest` PASS |
 | AC-6 화면 전환 | PASS | `NavigationFlowTest.homeToGuideToPickerToResult` |
 | AC-7 스크러버 1 step = 1 샘플, 동기 | PASS | `ResultViewModelTest.stepMovesExactlyOneSampleAndKeepsFrameSkeletonAnglesInSync`, `scrubberCellWidthIsOneSample`; 이미지·스켈레톤 겹침은 `DeviceSmokeTest` 스크린샷 육안 |
@@ -235,7 +264,7 @@ AlignmentGateResult(passed=false, ratio=0.19148937, holdSamples=47, reason=hold 
 | AC-15 ADR ≥ 5, 9개 섹션 | PASS | ADR 7개, `grep -L` 출력 없음 |
 | AC-16 민감 파일 무시 | PASS | `git check-ignore` 10행, porcelain grep exit=1 |
 
-요약: PASS 15, FAIL 1(AC-4), 수동 0(AC-5 비행기 모드·AC-7 육안은 수행 완료로 PASS에 포함), 미검증 1(AC-9b).
+요약(holdout3 재판정 반영): PASS 15, FAIL 1(AC-4), 수동 0(AC-5 비행기 모드·AC-7 육안은 수행 완료로 PASS에 포함), 미검증 1(AC-9b).
 
 전역 검사: `./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest` green(JVM 73 tests, skip 1 = hold-out fixture 없는 `WallHandstandAlignmentTest`), domain 경계 import 0, INTERNET 0. 영상 없는 instrumented(`notAnnotation=RequiresVideo`): SmokeTest 1 · FaultSheetTest 2 · NavigationFlowTest 3, 실패 0.
 
@@ -246,8 +275,8 @@ AlignmentGateResult(passed=false, ratio=0.19148937, holdSamples=47, reason=hold 
 
 ## 알려진 한계
 
-- **AC-4 FAIL** — 두 기준 영상 모두 정렬 게이트 미달, hold-out 홀드 47 샘플. 재촬영 또는 게이트 재정의 필요(사용자 결정).
-- **낮은 카메라 각도**: 두 영상 모두 바닥 근처에서 올려다보는 구도(가이드의 엉덩이 높이와 다름) — 2D 원근으로 각도가 왜곡될 수 있다. tune은 손이 벽에서 떨어져 몸이 ~19° 기운 자세라 어깨 닫힘이 전 구간 결함으로 나온다.
+- **AC-4 FAIL** — 재촬영 holdout3도 정렬 게이트 미달(61.2%, 홀드 116 샘플은 충족). 세 영상 모두 [175,185]/95% 미달 → 게이트 재정의(ADR) 여부 사용자 결정.
+- **낮은 카메라 각도**: tune·hold-out·holdout3 모두 바닥 근처에서 올려다보는 구도(가이드의 엉덩이 높이와 다름) — 2D 원근으로 각도가 왜곡될 수 있다. tune은 손이 벽에서 떨어져 몸이 ~19° 기운 자세라 어깨 닫힘이 전 구간 결함으로 나온다.
 - hold-out 팔꿈치 θ 255–281°(물리적으로 불가능) — landmark 오류로 추정, 원인 미조사(hold-out 동결).
 - **단일 기기**(SM-F766N, Android 16)에서만 측정. 성능·`setRotationDegrees` 동작·GPU 가용성은 기기 의존.
 - **CFR·8-bit 4:2:0 가정**(`CodecFrameSource`): VFR은 샘플 시각이 어긋날 수 있고 10-bit/HDR 미지원.
