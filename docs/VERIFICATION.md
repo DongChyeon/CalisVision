@@ -28,7 +28,7 @@
 | ② 4규칙 관절 평균 visibility (선택 측, 검출 프레임) | **0.978** (홀드 0.977) | 0.888 (홀드 0.912) | ≥ 0.5 |
 | ③ OrientationResolver score 0° / 180° | 0.743 / 0.083 | 0.592 / 0.000 | — |
 | ③ 선택 회전 (기대) | **0° (기대 180°) ✗** | 0° (기대 0°) ✓ | 둘 다 정확 |
-| ③ 참고: 180°를 비트맵 수동 회전(Matrix)으로 했을 때 score | 0.709 | 0.537 | — |
+| ③ 참고: 180°를 비트맵 수동 회전(Matrix)으로 했을 때 score (v2부터 프로덕션 경로) | 0.709 | 0.537 | — |
 | ④ SideSelector side / frontSign | LEFT / **+1 ✓** | LEFT / +1 ✓ (side 원본과 동일) | +1 |
 | ⑤ 디코드 ms/프레임 (getFrameAtTime OPTION_CLOSEST + 다운스케일) | 171–190 | 478–904 | — |
 | ⑤ 추론 ms/프레임 (VIDEO 모드) | 104–121 | 107–136 | — |
@@ -56,8 +56,9 @@
 
 **(a) `getFrameAtTime`의 회전 메타데이터 자동 적용 — 적용된다.** meta90 사본: `METADATA_KEY_VIDEO_ROTATION = 270`, 메타 크기 1080×1192, 디코드 비트맵 **1192×1080**(원본은 1080×1192), `RetrieverFrameSource` 출력 640×580. 수동 회전 불필요. 단, `VideoInfo.width/height`는 회전 전 값이므로 종횡비는 반드시 디코드된 비트맵 크기에서 가져와야 한다(현재 `PoseLandmarkerEngine`은 이미 그렇게 함). ffmpeg display_rotation 90은 Android에서 270으로 보고됨(방향 규약 차이).
 
-**(b) `setRotationDegrees(180)` 시 반환 좌표계 — 판정 불가.** 180° 입력에서 검출이 거의 되지 않아 비교 가능 프레임이 1개뿐이었고, 그 1개도 L 대비 차 0.246, (1−x,1−y) 대비 0.231로 둘 다 크다(오검출). `ROTATED_COORDS_ARE_IN_ROTATED_FRAME`은 **변경하지 않음**(근거 없음). 현재 두 영상 모두 0°가 선택되므로 플래그는 결과에 영향이 없다.
-- 권장: 180° 경로를 `setRotationDegrees` 대신 비트맵 Matrix 회전 + `(1−x,1−y)` 역변환으로 교체(실측 검증됨: 5/5 검출, 차 0.003), 또는 역자세 동작에서 180° 후보를 제거. 후자라면 `OrientationResolver`는 사실상 항상 0°를 선택한다.
+**(b) `setRotationDegrees(180)` 시 반환 좌표계 — 판정 불가(초회).** 180° 입력에서 검출이 거의 되지 않아 비교 가능 프레임이 1개뿐이었고, 그 1개도 L 대비 차 0.246, (1−x,1−y) 대비 0.231로 둘 다 크다(오검출).
+- **후속 조치(ADR-0006, 재측정 v2):** `MediaPipePoseDetector`의 180° 경로를 비트맵 `Matrix.postRotate(180)` → 0° 검출 → `(1−x,1−y)` 역변환으로 교체하고 `ROTATED_COORDS_ARE_IN_ROTATED_FRAME` 플래그를 제거했다. (b) 항목은 이제 P = detectImage(원본ᵢ, 180)(원본 좌표)와 flip(L), L = detectImage(rot180 사본ᵢ, 0)를 비교한다: 홀드 10프레임 10/10 검출, |P − flip(L)| = **0.0028**(허용 0.02, PASS), 음성 대조 |P − L| = 0.388, 같은 프레임 0° 결과와의 차 0.034.
+- v2 OrientationResolver score 0°/180°: 원본 0.743 / **0.709**, rot180 사본 0.592 / **0.537** → 선택은 둘 다 0°(변화 없음). 검출률·visibility·frontSign 값은 초회와 동일.
 
 ## 튜닝 영상 홀드 구간 signed θ (참고, 게이트 아님)
 

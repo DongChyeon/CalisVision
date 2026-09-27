@@ -2,7 +2,6 @@ package com.calisvision
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
@@ -25,11 +24,6 @@ import com.calisvision.test.TestVideos
 import com.calisvision.video.FrameSource
 import com.calisvision.video.RetrieverFrameSource
 import com.calisvision.video.SampledFrame
-import com.google.mediapipe.framework.image.BitmapImageBuilder
-import com.google.mediapipe.tasks.core.BaseOptions
-import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
-import com.google.mediapipe.tasks.vision.core.RunningMode
-import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -48,6 +42,8 @@ import kotlin.math.abs
  * so cross(ankle − shoulder, front) = cross((0, −1), (1, 0)) = 0·0 − (−1)·1 = +1. A 180° rotation maps every
  * difference vector v → −v, and cross(−u, −v) = cross(u, v), so the rot180 copy also expects frontSign = +1.
  * Orientation: original (hands at bottom) → 180°; rot180 copy (person already upright) → 0°.
+ * Since ADR-0006 these orientation labels are informational only; the gate is "the chosen rotation yields correct
+ * landmarks in original-frame coordinates" (detection, visibility, frontSign, and the (b) back-transform check).
  */
 @RequiresVideo
 @RunWith(AndroidJUnit4::class)
@@ -65,7 +61,6 @@ class PoseSpikeInstrumentedTest {
 
         val report = JSONObject()
             .put("device", "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
-            .put("rotatedCoordsAreInRotatedFrameFlag", MediaPipePoseDetector.ROTATED_COORDS_ARE_IN_ROTATED_FRAME)
 
         val videos = JSONObject()
         val tuneRun = analyze(tune, expectedRotation = 180, withTheta = true)
@@ -100,7 +95,7 @@ class PoseSpikeInstrumentedTest {
         val decodeMs = mutableListOf<Double>()
         val inferMs = mutableListOf<Double>()
         var totalMs = 0.0
-        lateinit var scores: Triple<Float, Float, Float>
+        lateinit var scores: Pair<Float, Float>
         val (rotation, processed) = RetrieverFrameSource.open(context, uri).use { raw ->
             val source = TimedFrameSource(raw, decodeMs)
             val rotation = MediaPipePoseDetector(context).use { detector ->
@@ -141,7 +136,6 @@ class PoseSpikeInstrumentedTest {
                 JSONObject()
                     .put("score0", scores.first.toDouble())
                     .put("score180", scores.second.toDouble())
-                    .put("score180ManualBitmapRotation", scores.third.toDouble())
                     .put("chosen", rotation)
                     .put("expected", expectedRotation ?: JSONObject.NULL)
                     .put("correct", expectedRotation?.let { it == rotation } ?: JSONObject.NULL),
@@ -171,29 +165,17 @@ class PoseSpikeInstrumentedTest {
         return Run(result, json)
     }
 
-    /**
-     * Production scores at 0°/180° (setRotationDegrees), plus the score when the bitmap is rotated 180° in memory, detected at 0°
-     * and mapped back with (1 − x, 1 − y) — shows what the resolver would pick if rotation bypassed setRotationDegrees.
-     */
-    private fun orientationScores(source: FrameSource, detector: PoseDetector): Triple<Float, Float, Float> {
+    /** Production scores at 0° and 180° (in-memory bitmap rotation + (1 − x, 1 − y) back-transform, ADR-0006). */
+    private fun orientationScores(source: FrameSource, detector: PoseDetector): Pair<Float, Float> {
         val upright = mutableListOf<FramePose>()
         val inverted = mutableListOf<FramePose>()
-        val manual = mutableListOf<FramePose>()
         for (index in OrientationResolver.sampleIndices(source.info.frameCount)) {
             val frame = source.frameAt(index) ?: continue
             upright += FramePose(index, frame.displayTimeMs, detector.detectImage(frame.bitmap, 0))
             inverted += FramePose(index, frame.displayTimeMs, detector.detectImage(frame.bitmap, 180))
-            val rotated = Bitmap.createBitmap(frame.bitmap, 0, 0, frame.bitmap.width, frame.bitmap.height, Matrix().apply { postRotate(180f) }, true)
-            val back = detector.detectImage(rotated, 0)?.map { it.copy(x = 1f - it.x, y = 1f - it.y) }
-            manual += FramePose(index, frame.displayTimeMs, back)
-            rotated.recycle()
             frame.bitmap.recycle()
         }
-        return Triple(
-            OrientationResolver.score(upright, exercise),
-            OrientationResolver.score(inverted, exercise),
-            OrientationResolver.score(manual, exercise),
-        )
+        return OrientationResolver.score(upright, exercise) to OrientationResolver.score(inverted, exercise)
     }
 
     private fun detectionRate(frames: List<FramePose>) = frames.count { it.landmarks != null }.toDouble() / frames.size
@@ -284,61 +266,41 @@ class PoseSpikeInstrumentedTest {
     }
 
     /**
-     * (b): raw MediaPipe landmarks (no back-transform) of the ORIGINAL frame run at rotation 180 vs the rot180 copy's frame
-     * at rotation 0 (L). raw ≈ L → coordinates are in the rotated frame; raw ≈ (1 − x, 1 − y) of L → the input frame.
-     * The whole hold segment is scanned until [PROBE_FRAMES] frames detect at 180°. Control: the original bitmap rotated
-     * 180° in memory (Matrix) and detected at 0°, compared with L, isolates setRotationDegrees from the re-encoded copy.
+     * (b): validates the production 180° path (bitmap rotated in memory, detected at 0°, mapped back with (1 − x, 1 − y)).
+     * For hold frame i: P = detectImage(original_i, 180) is in original-frame coords; L = detectImage(rot180copy_i, 0) is in
+     * the copy's (= rotated) frame, so flip(L) = (1 − x, 1 − y) of L is the same pose in original-frame coords.
+     * Pass: mean |P − flip(L)| < [BACK_TRANSFORM_TOLERANCE] (the copy is re-encoded, so ≈ 0 but not exactly). As a
+     * negative control |P − L| must be much larger, and P is also compared with detectImage(original_i, 0).
      */
     private fun probeCoordinateFrame(original: File, rot180: File, hold: IntRange): JSONObject {
-        val sameDiffs = mutableListOf<Double>()
         val flipDiffs = mutableListOf<Double>()
-        val prodDiffs = mutableListOf<Double>()
-        val controlDiffs = mutableListOf<Double>()
+        val sameDiffs = mutableListOf<Double>()
+        val vs0Diffs = mutableListOf<Double>()
         var scanned = 0
         var detectedAt180 = 0
-        var controlDetected = 0
-        var controlTried = 0
         val perFrame = JSONArray()
-        rawLandmarker().use { landmarker ->
-            MediaPipePoseDetector(context).use { detector ->
-                RetrieverFrameSource.open(context, Uri.fromFile(original)).use { origSource ->
-                    RetrieverFrameSource.open(context, Uri.fromFile(rot180)).use { rotSource ->
-                        for (index in hold) {
-                            if (sameDiffs.size >= PROBE_FRAMES) break
-                            val o = origSource.frameAt(index) ?: continue
-                            scanned++
-                            val raw = rawDetect(landmarker, o.bitmap, 180)
-                            val needControl = controlTried < PROBE_FRAMES
-                            if (raw == null && !needControl) {
-                                o.bitmap.recycle()
-                                continue
-                            }
-                            val r = rotSource.frameAt(index)
-                            val reference = r?.let { rawDetect(landmarker, it.bitmap, 0) }
-                            r?.bitmap?.recycle()
-                            if (needControl) {
-                                controlTried++
-                                val rotated = Bitmap.createBitmap(o.bitmap, 0, 0, o.bitmap.width, o.bitmap.height, Matrix().apply { postRotate(180f) }, true)
-                                val control = rawDetect(landmarker, rotated, 0)
-                                rotated.recycle()
-                                if (control != null) controlDetected++
-                                if (control != null && reference != null) controlDiffs += meanAbsDiff(control, reference, flip = false)
-                            }
-                            if (raw == null || reference == null) {
-                                o.bitmap.recycle()
-                                continue
-                            }
-                            detectedAt180++
-                            val production = detector.detectImage(o.bitmap, 180)
-                            o.bitmap.recycle()
-                            val same = meanAbsDiff(raw, reference, flip = false)
-                            val flip = meanAbsDiff(raw, reference, flip = true)
-                            sameDiffs += same
-                            flipDiffs += flip
-                            // Production output is in original-frame coords, so it should match (1 − x, 1 − y) of L.
-                            production?.let { p -> prodDiffs += meanAbsDiff(p.map { it.x to it.y }, reference, flip = true) }
-                            perFrame.put(JSONObject().put("sampleIndex", index).put("sameDiff", same).put("flipDiff", flip))
-                        }
+        MediaPipePoseDetector(context).use { detector ->
+            RetrieverFrameSource.open(context, Uri.fromFile(original)).use { origSource ->
+                RetrieverFrameSource.open(context, Uri.fromFile(rot180)).use { rotSource ->
+                    for (index in hold) {
+                        if (flipDiffs.size >= PROBE_FRAMES) break
+                        val o = origSource.frameAt(index) ?: continue
+                        scanned++
+                        val production = detector.detectImage(o.bitmap, 180)?.map { it.x to it.y }
+                        val at0 = detector.detectImage(o.bitmap, 0)?.map { it.x to it.y }
+                        o.bitmap.recycle()
+                        if (production == null) continue
+                        detectedAt180++
+                        val r = rotSource.frameAt(index) ?: continue
+                        val reference = detector.detectImage(r.bitmap, 0)?.map { it.x to it.y }
+                        r.bitmap.recycle()
+                        if (reference == null) continue
+                        val flip = meanAbsDiff(production, reference, flip = true)
+                        val same = meanAbsDiff(production, reference, flip = false)
+                        flipDiffs += flip
+                        sameDiffs += same
+                        at0?.let { vs0Diffs += meanAbsDiff(production, it, flip = false) }
+                        perFrame.put(JSONObject().put("sampleIndex", index).put("diffVsFlippedL", flip).put("diffVsL", same))
                     }
                 }
             }
@@ -346,32 +308,15 @@ class PoseSpikeInstrumentedTest {
         fun avg(values: List<Double>): Any = if (values.isEmpty()) JSONObject.NULL else values.average()
         return JSONObject()
             .put("holdFramesScanned", scanned)
-            .put("originalAt180DetectedAndCompared", detectedAt180)
-            .put("framesCompared", sameDiffs.size)
-            .put("meanDiffRawVsL", avg(sameDiffs))
-            .put("meanDiffRawVsFlippedL", avg(flipDiffs))
-            .put("coordsInRotatedFrame", if (sameDiffs.isEmpty()) JSONObject.NULL else sameDiffs.average() < flipDiffs.average())
-            .put("productionBackTransformDiffVsFlippedL", avg(prodDiffs))
-            .put("controlMatrixRotatedAt0Detected", "$controlDetected/$controlTried")
-            .put("controlMatrixRotatedVsL", avg(controlDiffs))
+            .put("originalAt180Detected", detectedAt180)
+            .put("framesCompared", flipDiffs.size)
+            .put("meanDiffProductionVsFlippedL", avg(flipDiffs))
+            .put("meanDiffProductionVsL", avg(sameDiffs))
+            .put("meanDiffProduction180VsOriginal0", avg(vs0Diffs))
+            .put("tolerance", BACK_TRANSFORM_TOLERANCE)
+            .put("backTransformOk", flipDiffs.isNotEmpty() && flipDiffs.average() < BACK_TRANSFORM_TOLERANCE)
             .put("perFrame", perFrame)
     }
-
-    private fun rawLandmarker(): PoseLandmarker = PoseLandmarker.createFromOptions(
-        context,
-        PoseLandmarker.PoseLandmarkerOptions.builder()
-            .setBaseOptions(BaseOptions.builder().setModelAssetPath(MediaPipePoseDetector.MODEL_ASSET).build())
-            .setRunningMode(RunningMode.IMAGE)
-            .setNumPoses(1)
-            .setMinPoseDetectionConfidence(0.5f)
-            .setMinPosePresenceConfidence(0.5f)
-            .setMinTrackingConfidence(0.5f)
-            .build(),
-    )
-
-    private fun rawDetect(landmarker: PoseLandmarker, bitmap: Bitmap, rotation: Int): List<Pair<Float, Float>>? =
-        landmarker.detect(BitmapImageBuilder(bitmap).build(), ImageProcessingOptions.builder().setRotationDegrees(rotation).build())
-            .landmarks().firstOrNull()?.map { it.x() to it.y() }
 
     private fun meanAbsDiff(a: List<Pair<Float, Float>>, b: List<Pair<Float, Float>>, flip: Boolean): Double =
         a.zip(b).map { (p, q) ->
@@ -405,6 +350,7 @@ class PoseSpikeInstrumentedTest {
         const val TUNE = "wall_handstand_tune"
         const val HOLDOUT = "wall_handstand_holdout"
         const val EXPECTED_FRONT_SIGN = 1
-        const val PROBE_FRAMES = 5
+        const val PROBE_FRAMES = 10
+        const val BACK_TRANSFORM_TOLERANCE = 0.02
     }
 }
