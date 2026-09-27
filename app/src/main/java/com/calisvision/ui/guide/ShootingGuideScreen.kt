@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.calisvision.R
 import com.calisvision.domain.rules.Exercise
@@ -70,7 +71,9 @@ fun ShootingGuideScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = CalisTheme.spacing.s20),
+                .testTag("guide_scroll")
+                .padding(horizontal = CalisTheme.spacing.s20)
+                .padding(bottom = CalisTheme.spacing.s24),
             verticalArrangement = Arrangement.spacedBy(CalisTheme.spacing.s16),
         ) {
             Text(stringResource(R.string.guide_headline), style = CalisTheme.typography.title3Bold, color = CalisTheme.colors.labelStrong)

@@ -58,6 +58,9 @@ class DeviceSmokeTest {
             compose.onNodeWithText(str(R.string.home_start)).performClick()
             compose.onNodeWithText(str(R.string.guide_headline)).assertExists()
             screenshot(shots, "guide")
+            compose.onNodeWithTag("guide_scroll").performTouchInput { swipeUp() }
+            Thread.sleep(500)
+            screenshot(shots, "guide_scrolled")
             compose.onNodeWithText(str(R.string.guide_pick_video)).performClick()
             compose.waitUntil(10_000) { compose.onAllNodesWithText(str(R.string.analysis_title)).fetchSemanticsNodes().isNotEmpty() }
             Thread.sleep(8_000)

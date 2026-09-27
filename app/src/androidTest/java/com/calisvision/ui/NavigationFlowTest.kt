@@ -1,21 +1,25 @@
 package com.calisvision.ui
 
 import android.content.Context
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.calisvision.CalisVisionApp
 import com.calisvision.R
+import com.calisvision.domain.knowledge.HandstandKnowledge
 import com.calisvision.test.FakeAnalyzer
 import com.calisvision.test.FakePickVideo
 import com.calisvision.test.SyntheticResult
 import com.calisvision.test.TestAppContainer
 import com.calisvision.video.AnalysisProgress
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,6 +51,22 @@ class NavigationFlowTest {
 
             compose.waitUntil(5_000) { compose.onAllNodesWithText(str(R.string.result_title)).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(str(R.string.fault_list_title)).assertExists()
+        }
+    }
+
+    /** Scrolled to the end, every "이 촬영으로 확인하는 자세" chip sits fully above the pick button. */
+    @Test
+    fun guideChipsEndAboveTheButton() {
+        (context as CalisVisionApp).container = TestAppContainer()
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            compose.onNodeWithText(str(R.string.home_start)).performClick()
+            val buttonTop = compose.onNodeWithText(str(R.string.guide_pick_video)).fetchSemanticsNode().boundsInRoot.top
+            HandstandKnowledge.exercise.shootingGuide.faultsCovered.forEach { name ->
+                val chip = compose.onNodeWithText(name).performScrollTo().assertIsDisplayed()
+                val bottom = chip.fetchSemanticsNode().boundsInRoot.bottom
+                assertTrue("$name bottom $bottom overlaps button top $buttonTop", bottom <= buttonTop)
+            }
         }
     }
 
