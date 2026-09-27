@@ -187,6 +187,20 @@ AlignmentGateResult(passed=false, ratio=0.19148937, holdSamples=47, reason=hold 
 - P1.5 기록의 30 s 55.5 s는 연속 실행 끝의 발열 상태 값(추론 147 ms)이었고, 이번 측정은 추론 105–115 ms 상태다.
 - `MediaPipePoseDetector`는 모델 경로·delegate 인자(기본 full·CPU)와 CPU 폴백을 갖는다 — 벤치마크용 seam이며 프로덕션 기본값은 변화 없음.
 
+## 메모리 (NFR 힙 ≤ 256MB)
+
+`PoseSpikeInstrumentedTest#spike`(프로덕션 CodecFrameSource → OrientationResolver → PoseLandmarkerEngine 경로, `wall_handstand_tune_30s.mp4` 포함 분석) 실행 중 `adb shell dumpsys meminfo com.calisvision`을 1초 간격으로 폴링, 각 지표의 실행 전체 최고치를 기록.
+
+| 항목 | 최고치 |
+|---|---|
+| Java Heap (PSS) | 34.8 MB (35,608 KB) |
+| Native Heap (PSS) | 85.4 MB (87,472 KB) — MediaPipe·비트맵 |
+| Graphics | 75.1 MB (76,872 KB) |
+| TOTAL PSS | 236.0 MB (241,650 KB) |
+
+- 기기: SM-F766N(Android 16, R3KL202BBMJ). 힙 상한: `dalvik.vm.heapgrowthlimit` 256m, `dalvik.vm.heapsize` 512m.
+- **PASS** — NFR의 "힙 ≤ 256MB"는 Java heap 기준. 최고치 34.8MB로 상한(256MB) 대비 여유 221MB. Native heap·Graphics는 별도 네이티브 할당(참고용)이며, TOTAL PSS도 236MB로 256MB 내에 든다.
+
 ## 비행기 모드 (§6-7, AC-5 수동)
 
 `adb shell cmd connectivity airplane-mode enable` + `adb shell svc wifi disable`(이 기기는 비행기 모드에서도 Wi-Fi 연결을 유지해 첫 시도 때 `ping 8.8.8.8` 성공 → 두 번째부터 Wi-Fi도 끔) → `Active default network: none`, `ping: Network is unreachable` 확인 → `DeviceSmokeTest`(실제 `DefaultVideoAnalyzer`로 tune 영상 홈→가이드→선택→분석→결과→결함 시트) → trap으로 복구(`airplane=0 wifi=1` 확인).
@@ -228,7 +242,7 @@ AlignmentGateResult(passed=false, ratio=0.19148937, holdSamples=47, reason=hold 
 ## NFR
 
 - NFR-2 30 s 영상 ≤ 60 s: **PASS** — full-CPU 연속 3회 42.0 / 42.1 / 43.0 s(여유 17 s), 단일 39.9 s. 실제 앱 경로(프레임 JPEG 저장 포함) 13 s tune 22.9 s, 17.7 s hold-out 29.9 s.
-- 힙 ≤ 256 MB: 미측정.
+- 힙 ≤ 256 MB: **PASS** — Java Heap 최고치 34.8 MB(상한 256 MB, 여유 221 MB). 상세는 위 "메모리 (NFR 힙 ≤ 256MB)".
 
 ## 알려진 한계
 
