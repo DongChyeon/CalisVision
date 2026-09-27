@@ -4,10 +4,15 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -72,57 +77,74 @@ fun TimelineScrubber(
     val currentLanes by rememberUpdatedState(lanes)
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing.s4)) {
-        Canvas(
-            Modifier
-                .fillMaxWidth()
-                .height(trackHeight)
-                .testTag("timeline")
-                .semantics {
-                    contentDescription = description
-                    progressBarRangeInfo = ProgressBarRangeInfo(sampleIndex.toFloat(), 0f..last.toFloat(), steps = (last - 1).coerceAtLeast(0))
-                    setProgress { target ->
-                        seek(target.roundToInt().coerceIn(0, last))
-                        true
+        BoxWithConstraints(Modifier.fillMaxWidth().height(trackHeight)) {
+            Canvas(
+                Modifier
+                    .fillMaxSize()
+                    .testTag("timeline")
+                    .semantics {
+                        contentDescription = description
+                        progressBarRangeInfo = ProgressBarRangeInfo(sampleIndex.toFloat(), 0f..last.toFloat(), steps = (last - 1).coerceAtLeast(0))
+                        setProgress { target ->
+                            seek(target.roundToInt().coerceIn(0, last))
+                            true
+                        }
                     }
-                }
-                .pointerInput(sampleCount) {
-                    fun cell(x: Float) = sampleAt(x, size.width.toFloat(), sampleCount)
-                    detectTapGestures { offset ->
-                        val index = cell(offset.x)
-                        seek(index)
-                        val lane = currentLanes.getOrNull(floor((offset.y - (laneTop - laneGap / 2).toPx()) / (laneHeight + laneGap).toPx()).toInt())
-                        currentBands.firstNotNullOfOrNull { band -> band.listed?.takeIf { it.faultId == lane && index in it.range } }?.let(bandTap)
+                    .pointerInput(sampleCount) {
+                        fun cell(x: Float) = sampleAt(x, size.width.toFloat(), sampleCount)
+                        detectTapGestures { offset ->
+                            val index = cell(offset.x)
+                            seek(index)
+                            val lane = currentLanes.getOrNull(floor((offset.y - (laneTop - laneGap / 2).toPx()) / (laneHeight + laneGap).toPx()).toInt())
+                            currentBands.firstNotNullOfOrNull { band -> band.listed?.takeIf { it.faultId == lane && index in it.range } }?.let(bandTap)
+                        }
                     }
-                }
-                .pointerInput(sampleCount) {
-                    fun cell(x: Float) = sampleAt(x, size.width.toFloat(), sampleCount)
-                    detectHorizontalDragGestures(onDragStart = { seek(cell(it.x)) }) { change, _ -> seek(cell(change.position.x)) }
-                },
-        ) {
-            if (sampleCount == 0) return@Canvas
-            val cellWidth = size.width / sampleCount
-            fun span(range: IntRange, top: Float, height: Float) =
-                Offset(range.first * cellWidth, top) to Size((range.last - range.first + 1) * cellWidth, height)
+                    .pointerInput(sampleCount) {
+                        fun cell(x: Float) = sampleAt(x, size.width.toFloat(), sampleCount)
+                        detectHorizontalDragGestures(onDragStart = { seek(cell(it.x)) }) { change, _ -> seek(cell(change.position.x)) }
+                    },
+            ) {
+                if (sampleCount == 0) return@Canvas
+                val cellWidth = size.width / sampleCount
+                fun span(range: IntRange, top: Float, height: Float) =
+                    Offset(range.first * cellWidth, top) to Size((range.last - range.first + 1) * cellWidth, height)
 
-            drawRoundRect(colors.fillAlternative, cornerRadius = CornerRadius(radius.large.toPx()))
-            hold?.let {
-                val (o, s) = span(it, 0f, size.height)
-                drawRect(appColors.holdSegmentHighlight, o, s)
-                drawRect(colors.primaryNormal, o, Size(spacing.s1.toPx(), size.height))
-                drawRect(colors.primaryNormal, Offset(o.x + s.width - spacing.s1.toPx(), 0f), Size(spacing.s1.toPx(), size.height))
+                drawRoundRect(colors.fillAlternative, cornerRadius = CornerRadius(radius.large.toPx()))
+                hold?.let {
+                    val (o, s) = span(it, 0f, size.height)
+                    drawRect(appColors.holdSegmentHighlight, o, s)
+                    drawRect(colors.primaryNormal, o, Size(spacing.s1.toPx(), size.height))
+                    drawRect(colors.primaryNormal, Offset(o.x + s.width - spacing.s1.toPx(), 0f), Size(spacing.s1.toPx(), size.height))
+                }
+                bands.forEach { band ->
+                    val lane = lanes.indexOf(band.fault.faultId)
+                    val top = (laneTop + (laneHeight + laneGap) * lane).toPx()
+                    val (o, s) = span(band.fault.range, top, laneHeight.toPx())
+                    drawRoundRect(appColors.fault.copy(alpha = MontageOpacity.O28), o, s, CornerRadius(radius.small.toPx()))
+                    band.listed?.let {
+                        val (lo, ls) = span(it.range, top, laneHeight.toPx())
+                        drawRoundRect(appColors.fault, lo, ls, CornerRadius(radius.small.toPx()))
+                    }
+                }
+                val x = (sampleIndex + 0.5f) * cellWidth
+                drawLine(colors.labelNormal, Offset(x, 0f), Offset(x, size.height), strokeWidth = spacing.s2.toPx())
             }
-            bands.forEach { band ->
-                val lane = lanes.indexOf(band.fault.faultId)
-                val top = (laneTop + (laneHeight + laneGap) * lane).toPx()
-                val (o, s) = span(band.fault.range, top, laneHeight.toPx())
-                drawRoundRect(appColors.fault.copy(alpha = MontageOpacity.O28), o, s, CornerRadius(radius.small.toPx()))
-                band.listed?.let {
-                    val (lo, ls) = span(it.range, top, laneHeight.toPx())
-                    drawRoundRect(appColors.fault, lo, ls, CornerRadius(radius.small.toPx()))
+            // Invisible, non-interactive markers over each drawn band so tests can find it; taps fall through to the Canvas.
+            if (sampleCount > 0) {
+                val cell = maxWidth / sampleCount
+                bands.forEach { band ->
+                    val top = laneTop + (laneHeight + laneGap) * lanes.indexOf(band.fault.faultId)
+                    listOfNotNull(band.fault to "timeline_band", band.listed?.let { it to "timeline_band_listed" }).forEach { (segment, tag) ->
+                        Spacer(
+                            Modifier
+                                .offset(x = cell * segment.range.first, y = top)
+                                .size(cell * (segment.range.last - segment.range.first + 1), laneHeight)
+                                .testTag(tag)
+                                .semantics { contentDescription = segment.fault.name },
+                        )
+                    }
                 }
             }
-            val x = (sampleIndex + 0.5f) * cellWidth
-            drawLine(colors.labelNormal, Offset(x, 0f), Offset(x, size.height), strokeWidth = spacing.s2.toPx())
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             val style = CalisTheme.typography.caption1Regular

@@ -14,8 +14,9 @@ import com.calisvision.domain.model.AnalysisResult
 import com.calisvision.domain.rules.Exercise
 import com.calisvision.video.AnalysisProgress
 import com.calisvision.video.VideoAnalyzer
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
 
 class TestAppContainer(
     override val analyzer: VideoAnalyzer = FakeAnalyzer(),
@@ -40,10 +41,17 @@ class FakePickVideo(var result: Uri? = Uri.parse("content://com.calisvision.test
     override fun parseResult(resultCode: Int, intent: Intent?): Uri? = null
 }
 
+/** Emits [progress]; when [gate] is set, suspends before [AnalysisProgress.Completed] until the gate completes. */
 class FakeAnalyzer(
+    private val gate: CompletableDeferred<Unit>? = null,
     private val progress: (Uri) -> List<AnalysisProgress> = { listOf(AnalysisProgress.Completed(emptyResult(it))) },
 ) : VideoAnalyzer {
-    override fun analyze(uri: Uri, exercise: Exercise): Flow<AnalysisProgress> = flowOf(*progress(uri).toTypedArray())
+    override fun analyze(uri: Uri, exercise: Exercise): Flow<AnalysisProgress> = flow {
+        progress(uri).forEach {
+            if (it is AnalysisProgress.Completed) gate?.await()
+            emit(it)
+        }
+    }
 
     companion object {
         fun emptyResult(uri: Uri) = AnalysisResult(
